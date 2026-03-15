@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Edit2, Power, Search, Fuel } from 'lucide-react'
+import { Plus, Edit2, Power, Search, Fuel, LayoutGrid, List } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
 import { CATEGORIA_LABELS, formatDateTime, formatNumber } from '../utils/format'
@@ -44,6 +44,7 @@ export default function Vehiculos() {
 
   const [filterDep,  setFilterDep]  = useState('')
   const [search,     setSearch]     = useState('')
+  const [viewMode,   setViewMode]   = useState('grid')
   const [detailV,    setDetailV]    = useState(null)
   const [formModal,  setFormModal]  = useState(false)
   const [editTarget, setEditTarget] = useState(null)
@@ -147,10 +148,97 @@ export default function Vehiculos() {
             <option key={d.id} value={d.id}>{d.nombre}</option>
           ))}
         </Select>
+        <div className="flex items-center gap-1 sm:ml-auto">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={clsx('w-9 h-9 flex items-center justify-center rounded-lg border transition-colors',
+              viewMode === 'grid'
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+            )}
+            title="Vista cuadrícula"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={clsx('w-9 h-9 flex items-center justify-center rounded-lg border transition-colors',
+              viewMode === 'list'
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+            )}
+            title="Vista lista"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Lista (tabla) */}
+      {viewMode === 'list' && (
+        <Card className="overflow-hidden mb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Placa</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Vehículo</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden md:table-cell">Dependencia</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden lg:table-cell">Combustible</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Estado</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {filtered.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-12 text-slate-400">No se encontraron vehículos.</td></tr>
+                )}
+                {filtered.map(v => {
+                  const dep = dependencias.find(d => d.id === v.dependencia_id)
+                  return (
+                    <tr
+                      key={v.id}
+                      className={clsx('hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer', !v.activo && 'opacity-50')}
+                      onClick={() => setDetailV(v)}
+                    >
+                      <td className="px-4 py-3 font-plate font-bold text-primary-600 text-base">{v.placa}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo}</p>
+                        <p className="text-xs text-slate-400">{TIPO_ICON[v.tipo] ?? '⚙'} {v.tipo} · {v.año}</p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell">{dep?.nombre ?? '—'}</td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <Badge variant={COMBUSTIBLE_BADGE[v.combustible] ?? 'neutral'}>
+                          <Fuel className="w-3 h-3 mr-1" />{v.combustible}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={v.activo ? 'success' : 'neutral'}>{v.activo ? 'Activo' : 'Inactivo'}</Badge>
+                      </td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-2">
+                          <Button variant="secondary" size="sm" icon={<Edit2 className="w-3.5 h-3.5" />} onClick={() => openEdit(v)}>Editar</Button>
+                          <Button
+                            variant={v.activo ? 'danger' : 'secondary'}
+                            size="sm"
+                            icon={<Power className="w-3.5 h-3.5" />}
+                            onClick={() => { if (confirm(`¿${v.activo ? 'Desactivar' : 'Activar'} vehículo ${v.placa}?`)) toggleVehiculoActivo(v.id) }}
+                          >
+                            {v.activo ? 'Desactivar' : 'Activar'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* Grid (cuadrícula) */}
+      {viewMode === 'grid' && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map(v => {
           const dep = dependencias.find(d => d.id === v.dependencia_id)
           return (
@@ -229,7 +317,7 @@ export default function Vehiculos() {
             No se encontraron vehículos con los filtros aplicados.
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Detail Modal */}
       <VehiculoDetailModal
