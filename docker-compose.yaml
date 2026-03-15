@@ -27,7 +27,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "node src/migrate.js && node src/app.js"
+    command: sh -c "node --max-http-header-size=32768 src/migrate.js && node --max-http-header-size=32768 src/app.js"
 
   frontend:
     build: .
