@@ -162,6 +162,7 @@ export default function Despachos() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">#</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Fecha/Hora</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Vehículo</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Producto</th>
@@ -174,7 +175,7 @@ export default function Despachos() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {paginated.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">No hay despachos con los filtros seleccionados</td>
+                  <td colSpan={8} className="text-center py-12 text-slate-400">No hay despachos con los filtros seleccionados</td>
                 </tr>
               )}
               {paginated.map(d => {
@@ -187,6 +188,7 @@ export default function Despachos() {
                     className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
                     onClick={() => setSelected(d)}
                   >
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-primary-600 whitespace-nowrap">#{String(d.id).padStart(6, '0')}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatDateTime(d.fecha_despacho)}</td>
                     <td className="px-4 py-3">
                       <p className="font-plate font-bold text-primary-600">{v?.placa}</p>
