@@ -1,10 +1,27 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import {
   DEPENDENCIAS,
   PRODUCTOS,
   VEHICULOS,
   DESPACHOS,
 } from '../utils/mockData'
+
+// Persist state to localStorage, seeding from mockData on first load
+function usePersistedState(key, seed) {
+  const [state, setState] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored) return JSON.parse(stored)
+    } catch {}
+    return seed
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(state)) } catch {}
+  }, [key, state])
+
+  return [state, setState]
+}
 
 const DataContext = createContext(null)
 
@@ -28,12 +45,12 @@ const INITIAL_AUDITORIA = [
 ]
 
 export function DataProvider({ children }) {
-  const [despachos,    setDespachos]    = useState(DESPACHOS)
-  const [productos,    setProductos]    = useState(PRODUCTOS)
-  const [vehiculos,    setVehiculos]    = useState(VEHICULOS)
-  const [dependencias, setDependencias] = useState(DEPENDENCIAS)
-  const [usuarios,     setUsuarios]     = useState(INITIAL_USUARIOS)
-  const [auditoria,    setAuditoria]    = useState(INITIAL_AUDITORIA)
+  const [despachos,    setDespachos]    = usePersistedState('uasd_despachos',    DESPACHOS)
+  const [productos,    setProductos]    = usePersistedState('uasd_productos',    PRODUCTOS)
+  const [vehiculos,    setVehiculos]    = usePersistedState('uasd_vehiculos',    VEHICULOS)
+  const [dependencias, setDependencias] = usePersistedState('uasd_dependencias', DEPENDENCIAS)
+  const [usuarios,     setUsuarios]     = usePersistedState('uasd_usuarios',     INITIAL_USUARIOS)
+  const [auditoria,    setAuditoria]    = usePersistedState('uasd_auditoria',    INITIAL_AUDITORIA)
 
   // ── helpers ──────────────────────────────────────────────────────────────
   function nextId(arr) {
