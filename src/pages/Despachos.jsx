@@ -38,8 +38,8 @@ export default function Despachos() {
   const filtered = useMemo(() => {
     return despachos.filter(d => {
       if (filterNumero) {
-        const num = filterNumero.replace(/^#0*/, '')
-        if (!String(d.id).includes(num)) return false
+        const num = filterNumero.replace(/^#?0*/, '')
+        if (!num || !String(d.id).includes(num)) return false
       }
       if (filterFechaDesde && d.fecha_despacho < filterFechaDesde) return false
       if (filterFechaHasta && d.fecha_despacho > filterFechaHasta + 'T23:59:59') return false
