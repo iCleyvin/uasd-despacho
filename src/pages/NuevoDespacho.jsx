@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
 import Input, { Select } from '../components/ui/Input'
 import Badge from '../components/ui/Badge'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
+import { api } from '../lib/api'
 
 const CATEGORIA_BADGE = {
   combustible:        'info',
@@ -55,6 +56,7 @@ export default function NuevoDespacho() {
   const [errors, setErrors]         = useState({})
   const [submitting, setSubmitting] = useState(false)
   const [ticket, setTicket]         = useState(null)
+  const [despachoSemana, setDespachoSemana]     = useState(null)
   const searchRef = useRef(null)
   const dropdownRef = useRef(null)
 
@@ -69,6 +71,20 @@ export default function NuevoDespacho() {
   }).filter(v => v.activo)
 
   const productoSeleccionado = productos.find(p => p.id === Number(form.producto_id))
+
+  // Chequeo de despacho en la misma semana
+  useEffect(() => {
+    if (!form.vehiculo_id || !form.producto_id) { setDespachoSemana(null); return }
+    const now = new Date()
+    const day = now.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + diff)
+    const fechaDesde = monday.toISOString().slice(0, 10)
+    api.get(`/despachos?vehiculo_id=${form.vehiculo_id}&producto_id=${form.producto_id}&fecha_desde=${fechaDesde}&limit=1`)
+      .then(res => setDespachoSemana(res.data?.[0] ?? null))
+      .catch(() => setDespachoSemana(null))
+  }, [form.vehiculo_id, form.producto_id])
 
   // close dropdown on outside click
   useEffect(() => {
@@ -104,6 +120,8 @@ export default function NuevoDespacho() {
     if (productoSeleccionado && Number(form.cantidad) > productoSeleccionado.stock_actual)
       e.cantidad = `Stock insuficiente. Disponible: ${productoSeleccionado.stock_actual} ${productoSeleccionado.unidad}`
     if (!form.solicitado_por.trim()) e.solicitado_por = 'Campo requerido'
+    if (despachoSemana && !form.observaciones.trim())
+      e.observaciones = 'Debe explicar el motivo del despacho repetido esta semana'
     return e
   }
 
@@ -384,6 +402,20 @@ export default function NuevoDespacho() {
               </div>
             )}
 
+            {despachoSemana && (
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800 dark:text-amber-300">Despacho reciente detectado</p>
+                  <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                    Este vehículo ya recibió <strong>{despachoSemana.producto_nombre}</strong> el{' '}
+                    <strong>{formatDateTime(despachoSemana.fecha_despacho)}</strong> ({despachoSemana.cantidad} {despachoSemana.unidad}).
+                    Debe ingresar una observación obligatoria explicando el motivo.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 items-end">
               <Input
                 label="Cantidad"
@@ -444,17 +476,32 @@ export default function NuevoDespacho() {
         </Card>
 
         {/* Observaciones */}
-        <Card>
+        <Card className={despachoSemana ? 'border-amber-300 dark:border-amber-700' : ''}>
           <CardBody>
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Observaciones</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Observaciones {despachoSemana && <span className="text-red-500">*</span>}
+              </label>
               <textarea
                 rows={3}
-                placeholder="Notas adicionales (opcional)"
+                placeholder={despachoSemana ? 'Explique el motivo del despacho repetido esta semana…' : 'Notas adicionales (opcional)'}
                 value={form.observaciones}
-                onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-600/40 focus:border-primary-600 transition-all resize-none"
+                onChange={e => {
+                  setForm(f => ({ ...f, observaciones: e.target.value }))
+                  setErrors(ev => ({ ...ev, observaciones: undefined }))
+                }}
+                className={clsx(
+                  'w-full rounded-lg border px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all resize-none',
+                  errors.observaciones
+                    ? 'border-red-400 dark:border-red-600 focus:ring-red-500/30 focus:border-red-500'
+                    : despachoSemana
+                      ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-500/30 focus:border-amber-500'
+                      : 'border-slate-200 dark:border-slate-600 focus:ring-primary-600/40 focus:border-primary-600'
+                )}
               />
+              {errors.observaciones && (
+                <p className="text-xs text-red-500 mt-0.5">{errors.observaciones}</p>
+              )}
             </div>
           </CardBody>
         </Card>
