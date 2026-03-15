@@ -1,11 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
+import Modal from '../components/ui/Modal'
 import { useData } from '../context/DataContext'
-import { CONSUMO_7DIAS } from '../utils/mockData'
-import { formatDateTime } from '../utils/format'
+import { api } from '../lib/api'
+import { formatDateTime, formatNumber } from '../utils/format'
+
+const CHART_COLORS = ['#1a3c8f', '#c8a951', '#10b981', '#f59e0b', '#6366f1']
 
 function KpiCard({ icon: Icon, label, value, sub, color, alert }) {
   return (
@@ -24,12 +27,99 @@ function KpiCard({ icon: Icon, label, value, sub, color, alert }) {
   )
 }
 
+function DetalleDespacho({ despacho }) {
+  if (!despacho) return null
+  return (
+    <div className="px-6 py-4 space-y-4 text-sm">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Fecha y hora</p>
+          <p className="font-medium text-slate-900 dark:text-slate-100">{formatDateTime(despacho.fecha_despacho)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Vehículo</p>
+          <p className="font-plate font-bold text-slate-900 dark:text-slate-100 text-lg leading-none">{despacho.placa}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{despacho.marca} {despacho.modelo}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Producto</p>
+          <p className="font-medium text-slate-900 dark:text-slate-100">{despacho.producto_nombre}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Cantidad</p>
+          <p className="font-bold text-2xl text-primary-600 leading-none">{formatNumber(despacho.cantidad, 0)}</p>
+          <p className="text-xs text-slate-500">{despacho.unidad}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Solicitado por</p>
+          <p className="font-medium text-slate-900 dark:text-slate-100">{despacho.solicitado_por}</p>
+        </div>
+        {despacho.despachador_nombre && (
+          <div>
+            <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Despachado por</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{despacho.despachador_nombre}</p>
+          </div>
+        )}
+        {despacho.cedula_receptor && (
+          <div>
+            <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Cédula receptor</p>
+            <p className="font-plate text-slate-900 dark:text-slate-100">{despacho.cedula_receptor}</p>
+          </div>
+        )}
+        {despacho.km_vehiculo && (
+          <div>
+            <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Km vehículo</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(despacho.km_vehiculo, 0)} km</p>
+          </div>
+        )}
+        {despacho.observaciones && (
+          <div className="col-span-2">
+            <p className="text-xs font-medium text-slate-400 uppercase mb-0.5">Observaciones</p>
+            <p className="text-slate-700 dark:text-slate-300">{despacho.observaciones}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const TODAY = new Date().toISOString().slice(0, 10)
 
 export default function Dashboard() {
   const { despachos, productos, vehiculos, loadDespachos } = useData()
 
+  const [consumoChart, setConsumoChart]       = useState([])
+  const [chartProductos, setChartProductos]   = useState([])
+  const [despachoDetalle, setDespachoDetalle] = useState(null)
+
   useEffect(() => { loadDespachos({ limit: 50 }) }, []) // eslint-disable-line
+
+  useEffect(() => {
+    api.get('/reportes/consumo-diario?dias=7')
+      .then(rows => {
+        const combustibles = rows.filter(r => r.categoria === 'combustible')
+        const names = [...new Set(combustibles.map(r => r.producto))]
+        setChartProductos(names)
+        const byDate = {}
+        combustibles.forEach(r => {
+          const fecha = r.fecha.slice(5).replace('-', '/')
+          if (!byDate[fecha]) byDate[fecha] = { fecha }
+          byDate[fecha][r.producto] = Number(r.total)
+        })
+        setConsumoChart(Object.values(byDate))
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleRowClick = useCallback(async (id) => {
+    setDespachoDetalle({ id, _loading: true })
+    try {
+      const data = await api.get(`/despachos/${id}`)
+      setDespachoDetalle(data)
+    } catch {
+      setDespachoDetalle(null)
+    }
+  }, [])
 
   const todayDespachos = despachos.filter(d => d.fecha_despacho?.startsWith(TODAY))
   const todayCombustible = todayDespachos
@@ -68,16 +158,23 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Consumo últimos 7 días (galones)</h2>
           </CardHeader>
           <CardBody>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={CONSUMO_7DIAS} barGap={4}>
-                <XAxis dataKey="fecha" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="gasolina" name="Gasolina" fill="#1a3c8f" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="gasoil"   name="Gasoil"   fill="#c8a951" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {consumoChart.length === 0 ? (
+              <div className="h-[220px] flex items-center justify-center text-sm text-slate-400">
+                Sin datos de consumo esta semana
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={consumoChart} barGap={4}>
+                  <XAxis dataKey="fecha" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {chartProductos.map((nombre, i) => (
+                    <Bar key={nombre} dataKey={nombre} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardBody>
         </Card>
 
@@ -121,7 +218,7 @@ export default function Dashboard() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700">
-                {['Fecha', 'Vehículo', 'Producto', 'Cantidad', 'Receptor'].map(h => (
+                {['#', 'Fecha', 'Vehículo', 'Producto', 'Cantidad', 'Receptor'].map(h => (
                   <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -130,7 +227,12 @@ export default function Dashboard() {
               {recentDespachos.map((d, i) => {
                 const veh = vehiculos.find(v => v.id === d.vehiculo_id)
                 return (
-                  <tr key={d.id} className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}>
+                  <tr
+                    key={d.id}
+                    onClick={() => handleRowClick(d.id)}
+                    className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}
+                  >
+                    <td className="px-6 py-3 font-mono text-xs font-semibold text-primary-600">#{String(d.id).padStart(6, '0')}</td>
                     <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(d.fecha_despacho)}</td>
                     <td className="px-6 py-3 font-plate font-semibold text-slate-900 dark:text-slate-100">{d.placa ?? veh?.placa}</td>
                     <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{d.producto_nombre}</td>
@@ -140,12 +242,28 @@ export default function Dashboard() {
                 )
               })}
               {recentDespachos.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">Sin despachos registrados</td></tr>
+                <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400">Sin despachos registrados</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {/* Modal detalle */}
+      <Modal
+        open={!!despachoDetalle}
+        onClose={() => setDespachoDetalle(null)}
+        title={despachoDetalle && !despachoDetalle._loading
+          ? `Despacho #${String(despachoDetalle.id).padStart(6, '0')}`
+          : 'Cargando…'}
+        size="md"
+      >
+        {despachoDetalle?._loading ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">Cargando detalle…</div>
+        ) : (
+          <DetalleDespacho despacho={despachoDetalle} />
+        )}
+      </Modal>
     </div>
   )
 }

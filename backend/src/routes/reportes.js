@@ -3,17 +3,18 @@ const db     = require('../db')
 const { requireAuth, requireRole } = require('../middleware/auth')
 
 // Consumo diario últimos N días
-router.get('/consumo-diario', requireAuth, requireRole('admin', 'supervisor'), async (req, res) => {
+router.get('/consumo-diario', requireAuth, async (req, res) => {
   const dias = Math.min(Number(req.query.dias ?? 7), 90)
   const { rows } = await db.query(`
     SELECT
       DATE(fecha_despacho) as fecha,
+      p.nombre as producto,
       p.categoria,
       SUM(d.cantidad) as total
     FROM despachos d
     JOIN productos p ON p.id = d.producto_id
     WHERE fecha_despacho >= NOW() - INTERVAL '${dias} days'
-    GROUP BY DATE(fecha_despacho), p.categoria
+    GROUP BY DATE(fecha_despacho), p.nombre, p.categoria
     ORDER BY fecha
   `)
   res.json(rows)
