@@ -350,6 +350,11 @@ async function run() {
     }
   }
 
+  // Nuevas columnas (idempotente)
+  await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS ficha_vieja VARCHAR(20)  DEFAULT NULL`)
+  await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS matricula   VARCHAR(30)  DEFAULT NULL`)
+  await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS chasis      VARCHAR(100) DEFAULT NULL`)
+
   const { rows: vu } = await db.query('SELECT COUNT(*) FROM usuarios')
   const { rows: vd } = await db.query('SELECT COUNT(*) FROM dependencias')
   const { rows: vv } = await db.query('SELECT COUNT(*) FROM vehiculos')

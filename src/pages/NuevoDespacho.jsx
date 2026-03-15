@@ -66,7 +66,9 @@ export default function NuevoDespacho() {
     return (
       v.placa.toLowerCase().includes(q) ||
       v.marca.toLowerCase().includes(q) ||
-      v.modelo.toLowerCase().includes(q)
+      v.modelo.toLowerCase().includes(q) ||
+      (v.matricula ?? '').toLowerCase().includes(q) ||
+      (v.ficha_vieja ?? '').toLowerCase().includes(q)
     )
   }).filter(v => v.activo)
 
@@ -283,8 +285,8 @@ export default function NuevoDespacho() {
               <div className="relative">
                 <Input
                   ref={searchRef}
-                  label="Buscar por placa o marca"
-                  placeholder="Ej: A-12345 o Toyota"
+                  label="Buscar por ficha, matrícula o marca"
+                  placeholder="Ej: F-012, A-12345 o Toyota"
                   value={vehiculoSearch}
                   onChange={e => { setVehiculoSearch(e.target.value); setShowDropdown(true) }}
                   onFocus={() => vehiculoSearch && setShowDropdown(true)}
@@ -305,7 +307,10 @@ export default function NuevoDespacho() {
                           onClick={() => handleVehiculoSelect(v)}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-left border-b border-slate-100 dark:border-slate-700 last:border-0"
                         >
-                          <span className="font-plate font-bold text-primary-600 text-lg w-24 shrink-0">{v.placa}</span>
+                          <div className="shrink-0 w-28">
+                            <p className="font-plate font-bold text-primary-600 text-lg leading-none">{v.placa}</p>
+                            {v.matricula && <p className="font-plate text-xs text-slate-500 mt-0.5">{v.matricula}</p>}
+                          </div>
                           <div>
                             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo} <span className="text-slate-400">({v.año})</span></p>
                             <p className="text-xs text-slate-500">{TIPO_ICON[v.tipo] ?? '⚙'} {d?.nombre ?? '—'}</p>
@@ -328,7 +333,15 @@ export default function NuevoDespacho() {
               <div className="flex items-center gap-4 p-4 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
                 <div className="text-3xl">{TIPO_ICON[selectedVehiculo.tipo] ?? '⚙'}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-plate font-bold text-primary-600 text-2xl leading-none">{selectedVehiculo.placa}</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-plate font-bold text-primary-600 text-2xl leading-none">{selectedVehiculo.placa}</p>
+                    {selectedVehiculo.ficha_vieja && (
+                      <span className="font-plate text-sm text-slate-400">Ficha ant.: {selectedVehiculo.ficha_vieja}</span>
+                    )}
+                  </div>
+                  {selectedVehiculo.matricula && (
+                    <p className="font-plate text-sm font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Matrícula: {selectedVehiculo.matricula}</p>
+                  )}
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-1">{selectedVehiculo.marca} {selectedVehiculo.modelo} — {selectedVehiculo.año}</p>
                   <p className="text-xs text-slate-500">{selectedVehiculo.tipo} · {selectedVehiculo.color} · {dep?.nombre}</p>
                 </div>

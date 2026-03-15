@@ -30,6 +30,9 @@ const COMBUSTIBLE_BADGE = {
 
 const EMPTY_FORM = {
   placa:          '',
+  ficha_vieja:    '',
+  matricula:      '',
+  chasis:         '',
   marca:          '',
   modelo:         '',
   año:            new Date().getFullYear(),
@@ -72,6 +75,9 @@ export default function Vehiculos() {
     setEditTarget(v)
     setForm({
       placa:          v.placa,
+      ficha_vieja:    v.ficha_vieja ?? '',
+      matricula:      v.matricula ?? '',
+      chasis:         v.chasis ?? '',
       marca:          v.marca,
       modelo:         v.modelo,
       año:            v.año,
@@ -181,7 +187,8 @@ export default function Vehiculos() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Placa</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Ficha</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden sm:table-cell">Matrícula</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Vehículo</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden md:table-cell">Dependencia</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden lg:table-cell">Combustible</th>
@@ -191,7 +198,7 @@ export default function Vehiculos() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-12 text-slate-400">No se encontraron vehículos.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-12 text-slate-400">No se encontraron vehículos.</td></tr>
                 )}
                 {filtered.map(v => {
                   const dep = dependencias.find(d => d.id === v.dependencia_id)
@@ -201,7 +208,11 @@ export default function Vehiculos() {
                       className={clsx('hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer', !v.activo && 'opacity-50')}
                       onClick={() => setDetailV(v)}
                     >
-                      <td className="px-4 py-3 font-plate font-bold text-primary-600 text-base">{v.placa}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-plate font-bold text-primary-600 text-base">{v.placa}</p>
+                        {v.ficha_vieja && <p className="font-plate text-xs text-slate-400">{v.ficha_vieja}</p>}
+                      </td>
+                      <td className="px-4 py-3 font-plate text-slate-700 dark:text-slate-300 hidden sm:table-cell">{v.matricula ?? '—'}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo}</p>
                         <p className="text-xs text-slate-400">{TIPO_ICON[v.tipo] ?? '⚙'} {v.tipo} · {v.año}</p>
@@ -248,13 +259,27 @@ export default function Vehiculos() {
               onClick={() => setDetailV(v)}
             >
               <CardBody className="space-y-3">
-                {/* Placa + status */}
+                {/* Ficha + status */}
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-plate font-bold text-primary-600 text-xl">{v.placa}</span>
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Ficha</p>
+                    <span className="font-plate font-bold text-primary-600 text-xl">{v.placa}</span>
+                    {v.ficha_vieja && (
+                      <span className="ml-2 text-xs text-slate-400 font-plate">({v.ficha_vieja})</span>
+                    )}
+                  </div>
                   <Badge variant={v.activo ? 'success' : 'neutral'}>
                     {v.activo ? 'Activo' : 'Inactivo'}
                   </Badge>
                 </div>
+
+                {/* Matrícula */}
+                {v.matricula && (
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Matrícula</p>
+                    <p className="font-plate font-semibold text-slate-800 dark:text-slate-200">{v.matricula}</p>
+                  </div>
+                )}
 
                 {/* Tipo + marca/modelo */}
                 <div className="flex items-center gap-2">
@@ -265,18 +290,9 @@ export default function Vehiculos() {
                   </div>
                 </div>
 
-                {/* Color + combustible */}
+                {/* Combustible */}
                 <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full border border-slate-300 shrink-0"
-                    style={{ background: v.color.toLowerCase() === 'blanco' ? '#fff' :
-                             v.color.toLowerCase() === 'negro' ? '#1e293b' :
-                             v.color.toLowerCase() === 'azul' ? '#1d4ed8' :
-                             v.color.toLowerCase() === 'gris' ? '#94a3b8' :
-                             v.color.toLowerCase() === 'rojo' ? '#dc2626' : '#94a3b8' }}
-                  />
-                  <span className="text-xs text-slate-500">{v.color}</span>
-                  <Badge variant={COMBUSTIBLE_BADGE[v.combustible] ?? 'neutral'} className="ml-auto">
+                  <Badge variant={COMBUSTIBLE_BADGE[v.combustible] ?? 'neutral'}>
                     <Fuel className="w-3 h-3 mr-1" />{v.combustible}
                   </Badge>
                 </div>
@@ -336,15 +352,42 @@ export default function Vehiculos() {
         size="lg"
       >
         <form onSubmit={handleSave} className="p-6 space-y-4">
+          {/* Identificación */}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Identificación</p>
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Placa *"
-              placeholder="A-00000"
+              label="Ficha Nueva *"
+              placeholder="F-001"
               value={form.placa}
               onChange={e => field('placa', e.target.value.toUpperCase())}
               error={errors.placa}
               mono
             />
+            <Input
+              label="Ficha Vieja"
+              placeholder="Ej: 234"
+              value={form.ficha_vieja}
+              onChange={e => field('ficha_vieja', e.target.value.toUpperCase())}
+              mono
+            />
+            <Input
+              label="Matrícula (Placa)"
+              placeholder="A-123456"
+              value={form.matricula}
+              onChange={e => field('matricula', e.target.value.toUpperCase())}
+              mono
+            />
+            <Input
+              label="Chasis"
+              placeholder="Número de chasis"
+              value={form.chasis}
+              onChange={e => field('chasis', e.target.value.toUpperCase())}
+              mono
+            />
+          </div>
+          {/* Datos del vehículo */}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pt-1">Datos del vehículo</p>
+          <div className="grid grid-cols-2 gap-4">
             <Select
               label="Dependencia *"
               value={form.dependencia_id}
@@ -436,7 +479,22 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, onC
       <div className="p-6 space-y-5">
         {/* Info */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-          <Field label="Placa"><span className="font-plate font-bold text-primary-600 text-xl">{vehiculo.placa}</span></Field>
+          <Field label="Ficha Nueva">
+            <span className="font-plate font-bold text-primary-600 text-xl">{vehiculo.placa}</span>
+          </Field>
+          {vehiculo.ficha_vieja && (
+            <Field label="Ficha Vieja">
+              <span className="font-plate font-semibold text-slate-700 dark:text-slate-300">{vehiculo.ficha_vieja}</span>
+            </Field>
+          )}
+          {vehiculo.matricula && (
+            <Field label="Matrícula">
+              <span className="font-plate font-semibold text-slate-800 dark:text-slate-200">{vehiculo.matricula}</span>
+            </Field>
+          )}
+          {vehiculo.chasis && (
+            <Field label="Chasis" value={vehiculo.chasis} />
+          )}
           <Field label="Marca/Modelo" value={`${vehiculo.marca} ${vehiculo.modelo}`} />
           <Field label="Año" value={vehiculo.año} />
           <Field label="Tipo" value={`${TIPO_ICON[vehiculo.tipo]} ${vehiculo.tipo}`} />
