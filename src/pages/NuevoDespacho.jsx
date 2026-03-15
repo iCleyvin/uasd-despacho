@@ -114,8 +114,7 @@ export default function NuevoDespacho() {
     setErrors({})
     setSubmitting(true)
     try {
-      await new Promise(r => setTimeout(r, 400))
-      const despacho = crearDespacho({
+      const despacho = await crearDespacho({
         vehiculo_id:     form.vehiculo_id,
         producto_id:     Number(form.producto_id),
         cantidad:        Number(form.cantidad),
