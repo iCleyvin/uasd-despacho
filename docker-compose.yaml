@@ -33,6 +33,8 @@ services:
     build: .
     hostname: frontend
     restart: unless-stopped
+    dns: 127.0.0.11
+    dns_search: []
     depends_on:
       - api
 
