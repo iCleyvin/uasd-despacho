@@ -20,9 +20,11 @@ const CATEGORIA_BADGE = {
 
 const TIPO_ICON = {
   sedan:       '🚗',
+  jeepeta:     '🚙',
   pickup:      '🛻',
   camion:      '🚛',
   autobus:     '🚌',
+  tren:        '🚂',
   motocicleta: '🏍',
   otro:        '⚙',
 }
@@ -312,7 +314,7 @@ export default function NuevoDespacho() {
                             {v.matricula && <p className="font-plate text-xs text-slate-500 mt-0.5">{v.matricula}</p>}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo} <span className="text-slate-400">({v.año})</span></p>
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo} <span className="text-slate-400">({v.anio})</span></p>
                             <p className="text-xs text-slate-500">{TIPO_ICON[v.tipo] ?? '⚙'} {d?.nombre ?? '—'}</p>
                           </div>
                         </button>
@@ -342,7 +344,7 @@ export default function NuevoDespacho() {
                   {selectedVehiculo.matricula && (
                     <p className="font-plate text-sm font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Matrícula: {selectedVehiculo.matricula}</p>
                   )}
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-1">{selectedVehiculo.marca} {selectedVehiculo.modelo} — {selectedVehiculo.año}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-1">{selectedVehiculo.marca} {selectedVehiculo.modelo} — {selectedVehiculo.anio}</p>
                   <p className="text-xs text-slate-500">{selectedVehiculo.tipo} · {selectedVehiculo.color} · {dep?.nombre}</p>
                 </div>
                 <button

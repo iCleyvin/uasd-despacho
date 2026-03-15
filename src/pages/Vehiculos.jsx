@@ -9,14 +9,16 @@ import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardBody } from '../components/ui/Card'
 
-const TIPO_OPTIONS = ['sedan', 'pickup', 'camion', 'autobus', 'motocicleta', 'otro']
+const TIPO_OPTIONS = ['sedan', 'jeepeta', 'pickup', 'camion', 'autobus', 'tren', 'motocicleta', 'otro']
 const COMBUSTIBLE_OPTIONS = ['gasolina', 'gasoil', 'electrico', 'hibrido']
 
 const TIPO_ICON = {
   sedan:       '🚗',
+  jeepeta:     '🚙',
   pickup:      '🛻',
   camion:      '🚛',
   autobus:     '🚌',
+  tren:        '🚂',
   motocicleta: '🏍',
   otro:        '⚙',
 }
@@ -35,7 +37,7 @@ const EMPTY_FORM = {
   chasis:         '',
   marca:          '',
   modelo:         '',
-  año:            new Date().getFullYear(),
+  anio:           new Date().getFullYear(),
   tipo:           'sedan',
   color:          '',
   dependencia_id: '',
@@ -80,7 +82,7 @@ export default function Vehiculos() {
       chasis:         v.chasis ?? '',
       marca:          v.marca,
       modelo:         v.modelo,
-      año:            v.año,
+      anio:           v.anio,
       tipo:           v.tipo,
       color:          v.color,
       dependencia_id: v.dependencia_id,
@@ -96,7 +98,7 @@ export default function Vehiculos() {
     if (!form.marca.trim())          e.marca = 'Campo requerido'
     if (!form.modelo.trim())         e.modelo = 'Campo requerido'
     if (!form.dependencia_id)        e.dependencia_id = 'Seleccione una dependencia'
-    if (!form.año || form.año < 1990) e.año = 'Año inválido'
+    if (!form.anio || form.anio < 1990) e.anio = 'Año inválido'
     return e
   }
 
@@ -106,7 +108,7 @@ export default function Vehiculos() {
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setSaving(true)
     await new Promise(r => setTimeout(r, 350))
-    const payload = { ...form, año: Number(form.año), dependencia_id: Number(form.dependencia_id) }
+    const payload = { ...form, anio: Number(form.anio), dependencia_id: Number(form.dependencia_id) }
     if (editTarget) {
       editarVehiculo(editTarget.id, payload)
     } else {
@@ -215,7 +217,7 @@ export default function Vehiculos() {
                       <td className="px-4 py-3 font-plate text-slate-700 dark:text-slate-300 hidden sm:table-cell">{v.matricula ?? '—'}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-800 dark:text-slate-200">{v.marca} {v.modelo}</p>
-                        <p className="text-xs text-slate-400">{TIPO_ICON[v.tipo] ?? '⚙'} {v.tipo} · {v.año}</p>
+                        <p className="text-xs text-slate-400">{TIPO_ICON[v.tipo] ?? '⚙'} {v.tipo} · {v.anio}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 hidden md:table-cell">{dep?.nombre ?? '—'}</td>
                       <td className="px-4 py-3 hidden lg:table-cell">
@@ -286,7 +288,7 @@ export default function Vehiculos() {
                   <span className="text-2xl">{TIPO_ICON[v.tipo] ?? '⚙'}</span>
                   <div>
                     <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{v.marca} {v.modelo}</p>
-                    <p className="text-xs text-slate-400">{v.año} · {v.tipo}</p>
+                    <p className="text-xs text-slate-400">{v.anio} · {v.tipo}</p>
                   </div>
                 </div>
 
@@ -416,9 +418,9 @@ export default function Vehiculos() {
               type="number"
               min="1990"
               max={new Date().getFullYear() + 1}
-              value={form.año}
-              onChange={e => field('año', e.target.value)}
-              error={errors.año}
+              value={form.anio}
+              onChange={e => field('anio', e.target.value)}
+              error={errors.anio}
             />
             <Input
               label="Color"
@@ -496,7 +498,7 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, onC
             <Field label="Chasis" value={vehiculo.chasis} />
           )}
           <Field label="Marca/Modelo" value={`${vehiculo.marca} ${vehiculo.modelo}`} />
-          <Field label="Año" value={vehiculo.año} />
+          <Field label="Año" value={vehiculo.anio} />
           <Field label="Tipo" value={`${TIPO_ICON[vehiculo.tipo]} ${vehiculo.tipo}`} />
           <Field label="Color" value={vehiculo.color} />
           <Field label="Combustible">
