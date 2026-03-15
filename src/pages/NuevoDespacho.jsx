@@ -23,6 +23,8 @@ const TIPO_ICON = {
   jeepeta:     '🚙',
   pickup:      '🛻',
   camion:      '🚛',
+  microbus:    '🚐',
+  minibus:     '🚌',
   autobus:     '🚌',
   tren:        '🚂',
   motocicleta: '🏍',

@@ -9,7 +9,7 @@ import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardBody } from '../components/ui/Card'
 
-const TIPO_OPTIONS = ['sedan', 'jeepeta', 'pickup', 'camion', 'autobus', 'tren', 'motocicleta', 'otro']
+const TIPO_OPTIONS = ['sedan', 'jeepeta', 'pickup', 'camion', 'microbus', 'minibus', 'autobus', 'tren', 'motocicleta', 'otro']
 const COMBUSTIBLE_OPTIONS = ['gasolina', 'gasoil', 'electrico', 'hibrido']
 
 const TIPO_ICON = {
@@ -17,6 +17,8 @@ const TIPO_ICON = {
   jeepeta:     '🚙',
   pickup:      '🛻',
   camion:      '🚛',
+  microbus:    '🚐',
+  minibus:     '🚌',
   autobus:     '🚌',
   tren:        '🚂',
   motocicleta: '🏍',
