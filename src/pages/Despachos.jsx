@@ -31,11 +31,16 @@ export default function Despachos() {
   const [filterFechaHasta, setFilterFechaHasta] = useState('')
   const [filterVehiculo,   setFilterVehiculo]   = useState('')
   const [filterProducto,   setFilterProducto]   = useState('')
+  const [filterNumero,     setFilterNumero]     = useState('')
   const [page, setPage]         = useState(1)
   const [selected, setSelected] = useState(null)
 
   const filtered = useMemo(() => {
     return despachos.filter(d => {
+      if (filterNumero) {
+        const num = filterNumero.replace(/^#0*/, '')
+        if (!String(d.id).includes(num)) return false
+      }
       if (filterFechaDesde && d.fecha_despacho < filterFechaDesde) return false
       if (filterFechaHasta && d.fecha_despacho > filterFechaHasta + 'T23:59:59') return false
       if (filterProducto && d.producto_id !== Number(filterProducto)) return false
@@ -47,7 +52,7 @@ export default function Despachos() {
       }
       return true
     }).sort((a, b) => b.fecha_despacho.localeCompare(a.fecha_despacho))
-  }, [despachos, filterFechaDesde, filterFechaHasta, filterVehiculo, filterProducto, vehiculos])
+  }, [despachos, filterFechaDesde, filterFechaHasta, filterVehiculo, filterProducto, filterNumero, vehiculos])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -57,11 +62,12 @@ export default function Despachos() {
     setFilterFechaHasta('')
     setFilterVehiculo('')
     setFilterProducto('')
+    setFilterNumero('')
     setPage(1)
   }
 
   function hasFilters() {
-    return filterFechaDesde || filterFechaHasta || filterVehiculo || filterProducto
+    return filterFechaDesde || filterFechaHasta || filterVehiculo || filterProducto || filterNumero
   }
 
   function exportCSV() {
@@ -114,7 +120,15 @@ export default function Despachos() {
       {/* Filtros */}
       <Card className="mb-4">
         <CardBody className="py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <Input
+              label="N° Despacho"
+              placeholder="#000001"
+              value={filterNumero}
+              onChange={e => { setFilterNumero(e.target.value); setPage(1) }}
+              icon={<Search className="w-4 h-4" />}
+              mono
+            />
             <Input
               label="Desde"
               type="date"

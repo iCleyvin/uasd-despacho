@@ -13,23 +13,23 @@ const TIPO_OPTIONS = ['sedan', 'jeepeta', 'pickup', 'camion', 'microbus', 'minib
 const COMBUSTIBLE_OPTIONS = ['gasolina', 'gasoil', 'electrico', 'hibrido']
 
 const TIPO_ICON = {
-  sedan:       '🚗',
-  jeepeta:     '🚙',
-  pickup:      '🛻',
-  camion:      '🚛',
-  microbus:    '🚐',
-  minibus:     '🚌',
-  autobus:     '🚌',
-  tren:        '🚂',
-  motocicleta: '🏍',
-  otro:        '⚙',
+  Sedan:       '🚗',
+  Jeepeta:     '🚙',
+  Pickup:      '🛻',
+  Camion:      '🚛',
+  Microbus:    '🚐',
+  Minibus:     '🚌',
+  Autobus:     '🚌',
+  Tren:        '🚂',
+  Motocicleta: '🏍',
+  Otro:        '⚙',
 }
 
 const COMBUSTIBLE_BADGE = {
-  gasolina: 'info',
-  gasoil:   'warning',
-  electrico:'success',
-  hibrido:  'neutral',
+  Gasolina: 'info',
+  Gasoil:   'warning',
+  Electrico:'success',
+  Hibrido:  'neutral',
 }
 
 const EMPTY_FORM = {
@@ -63,7 +63,8 @@ export default function Vehiculos() {
     if (filterDep && v.dependencia_id !== Number(filterDep)) return false
     if (search) {
       const q = search.toLowerCase()
-      if (!v.placa.toLowerCase().includes(q) && !v.marca.toLowerCase().includes(q) && !v.modelo.toLowerCase().includes(q)) return false
+      const matchFichaVieja = v.ficha_vieja ? v.ficha_vieja.toLowerCase().includes(q) : false
+      if (!v.placa.toLowerCase().includes(q) && !v.marca.toLowerCase().includes(q) && !v.modelo.toLowerCase().includes(q) && !matchFichaVieja) return false
     }
     return true
   }), [vehiculos, filterDep, search])
@@ -142,7 +143,7 @@ export default function Vehiculos() {
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <Input
-          placeholder="Buscar placa, marca o modelo…"
+          placeholder="Buscar placa, ficha vieja, marca…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           icon={<Search className="w-4 h-4" />}
