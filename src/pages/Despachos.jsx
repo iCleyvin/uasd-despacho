@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Download, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
@@ -20,7 +20,12 @@ const CATEGORIA_BADGE = {
 }
 
 export default function Despachos() {
-  const { despachos, vehiculos, productos, dependencias, usuarios } = useData()
+  const { despachos, vehiculos, productos, dependencias, usuarios, loadDespachos, loadUsuarios } = useData()
+
+  useEffect(() => {
+    loadDespachos()
+    loadUsuarios()
+  }, []) // eslint-disable-line
 
   const [filterFechaDesde, setFilterFechaDesde] = useState('')
   const [filterFechaHasta, setFilterFechaHasta] = useState('')

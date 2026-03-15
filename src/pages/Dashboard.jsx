@@ -1,10 +1,11 @@
-import { Fuel, Droplets, AlertTriangle, ClipboardCheck, TrendingUp, ArrowRight } from 'lucide-react'
+import { useEffect } from 'react'
+import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
-import Badge from '../components/ui/Badge'
-import { DESPACHOS, VEHICULOS, DEPENDENCIAS, PRODUCTOS, CONSUMO_7DIAS } from '../utils/mockData'
-import { formatDateTime, CATEGORIA_LABELS } from '../utils/format'
+import { useData } from '../context/DataContext'
+import { CONSUMO_7DIAS } from '../utils/mockData'
+import { formatDateTime } from '../utils/format'
 
 function KpiCard({ icon: Icon, label, value, sub, color, alert }) {
   return (
@@ -23,41 +24,45 @@ function KpiCard({ icon: Icon, label, value, sub, color, alert }) {
   )
 }
 
-const TODAY = '2026-03-15'
+const TODAY = new Date().toISOString().slice(0, 10)
 
 export default function Dashboard() {
-  const todayDespachos = DESPACHOS.filter(d => d.fecha_despacho.startsWith(TODAY))
-  const todayCombustible = todayDespachos
-    .filter(d => [1,2].includes(d.producto_id))
-    .reduce((s, d) => s + d.cantidad, 0)
-  const todayAceite = todayDespachos
-    .filter(d => [3,4].includes(d.producto_id))
-    .reduce((s, d) => s + d.cantidad, 0)
-  const lowStock = PRODUCTOS.filter(p => p.stock_actual <= p.stock_minimo)
+  const { despachos, productos, vehiculos, loadDespachos } = useData()
 
-  const recentDespachos = [...DESPACHOS]
-    .sort((a, b) => new Date(b.fecha_despacho) - new Date(a.fecha_despacho))
-    .slice(0, 10)
+  useEffect(() => { loadDespachos({ limit: 50 }) }, []) // eslint-disable-line
+
+  const todayDespachos = despachos.filter(d => d.fecha_despacho?.startsWith(TODAY))
+  const todayCombustible = todayDespachos
+    .filter(d => d.categoria === 'combustible' || [1, 2].includes(d.producto_id))
+    .reduce((s, d) => s + Number(d.cantidad), 0)
+  const todayAceite = todayDespachos
+    .filter(d => d.categoria === 'aceite_motor' || [3, 4].includes(d.producto_id))
+    .reduce((s, d) => s + Number(d.cantidad), 0)
+  const lowStock = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
+  const recentDespachos = despachos.slice(0, 10)
 
   return (
     <div className="space-y-6">
-      {/* Page title */}
       <div>
         <h1 className="text-xl font-bold font-display text-slate-900 dark:text-slate-100">Dashboard</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Resumen del día · 15/03/2026</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          Resumen del día · {new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+        </p>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={ClipboardCheck} label="Despachos hoy"    value={todayDespachos.length}           color="bg-primary-600" />
-        <KpiCard icon={Fuel}          label="Combustible hoy"  value={`${todayCombustible} gal`}        color="bg-gold-500" />
-        <KpiCard icon={Droplets}      label="Aceite motor hoy" value={`${todayAceite} ctos`}            color="bg-emerald-600" />
-        <KpiCard icon={AlertTriangle} label="Alertas stock"    value={lowStock.length} alert={lowStock.length > 0} color={lowStock.length > 0 ? 'bg-red-500' : 'bg-slate-400'} sub={lowStock.length > 0 ? 'Productos bajo mínimo' : 'Todo en orden'} />
+        <KpiCard icon={ClipboardCheck} label="Despachos hoy"    value={todayDespachos.length}    color="bg-primary-600" />
+        <KpiCard icon={Fuel}          label="Combustible hoy"  value={`${todayCombustible} gal`} color="bg-gold-500" />
+        <KpiCard icon={Droplets}      label="Aceite motor hoy" value={`${todayAceite} ctos`}     color="bg-emerald-600" />
+        <KpiCard icon={AlertTriangle} label="Alertas stock"    value={lowStock.length}
+          alert={lowStock.length > 0}
+          color={lowStock.length > 0 ? 'bg-red-500' : 'bg-slate-400'}
+          sub={lowStock.length > 0 ? 'Productos bajo mínimo' : 'Todo en orden'} />
       </div>
 
       {/* Charts row */}
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Bar chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Consumo últimos 7 días (galones)</h2>
@@ -67,9 +72,7 @@ export default function Dashboard() {
               <BarChart data={CONSUMO_7DIAS} barGap={4}>
                 <XAxis dataKey="fecha" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: 12 }}
-                />
+                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="gasolina" name="Gasolina" fill="#1a3c8f" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gasoil"   name="Gasoil"   fill="#c8a951" radius={[4, 4, 0, 0]} />
@@ -78,16 +81,15 @@ export default function Dashboard() {
           </CardBody>
         </Card>
 
-        {/* Stock alerts */}
         <Card>
           <CardHeader>
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Estado de inventario</h2>
           </CardHeader>
           <CardBody className="space-y-3">
-            {PRODUCTOS.slice(0, 6).map(p => {
-              const pct = Math.min(100, (p.stock_actual / (p.stock_minimo * 3)) * 100)
-              const isLow = p.stock_actual <= p.stock_minimo
-              const isCrit = p.stock_actual <= p.stock_minimo * 0.5
+            {productos.slice(0, 6).map(p => {
+              const pct = Math.min(100, (Number(p.stock_actual) / (Number(p.stock_minimo) * 3)) * 100)
+              const isLow  = Number(p.stock_actual) <= Number(p.stock_minimo)
+              const isCrit = Number(p.stock_actual) <= Number(p.stock_minimo) * 0.5
               return (
                 <div key={p.id}>
                   <div className="flex items-center justify-between mb-1">
@@ -97,10 +99,8 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${isCrit ? 'bg-red-500' : isLow ? 'bg-amber-400' : 'bg-emerald-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
+                    <div className={`h-full rounded-full transition-all ${isCrit ? 'bg-red-500' : isLow ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                      style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               )
@@ -109,7 +109,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent dispatches table */}
+      {/* Recent dispatches */}
       <Card>
         <CardHeader className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Últimos despachos</h2>
@@ -128,20 +128,20 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {recentDespachos.map((d, i) => {
-                const veh = VEHICULOS.find(v => v.id === d.vehiculo_id)
-                const prod = PRODUCTOS.find(p => p.id === d.producto_id)
+                const veh = vehiculos.find(v => v.id === d.vehiculo_id)
                 return (
                   <tr key={d.id} className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}>
                     <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(d.fecha_despacho)}</td>
-                    <td className="px-6 py-3 font-plate font-semibold text-slate-900 dark:text-slate-100">{veh?.placa}</td>
-                    <td className="px-6 py-3">
-                      <span className="text-slate-700 dark:text-slate-300">{prod?.nombre}</span>
-                    </td>
+                    <td className="px-6 py-3 font-plate font-semibold text-slate-900 dark:text-slate-100">{d.placa ?? veh?.placa}</td>
+                    <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{d.producto_nombre}</td>
                     <td className="px-6 py-3 font-semibold text-slate-900 dark:text-slate-100">{d.cantidad} {d.unidad}</td>
                     <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{d.solicitado_por}</td>
                   </tr>
                 )
               })}
+              {recentDespachos.length === 0 && (
+                <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">Sin despachos registrados</td></tr>
+              )}
             </tbody>
           </table>
         </div>

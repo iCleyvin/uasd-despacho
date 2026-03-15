@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Eye, ShieldOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
@@ -29,8 +29,13 @@ const TABLA_LABELS = {
 
 export default function Auditoria() {
   const { user, hasRole } = useAuth()
-  const { auditoria, usuarios } = useData()
+  const { auditoria, usuarios, loadAuditoria, loadUsuarios } = useData()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    loadAuditoria()
+    loadUsuarios()
+  }, []) // eslint-disable-line
 
   const [filterUsuario, setFilterUsuario] = useState('')
   const [filterDesde,   setFilterDesde]   = useState('')

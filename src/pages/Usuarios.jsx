@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
@@ -26,8 +26,10 @@ const EMPTY_FORM = {
 
 export default function Usuarios() {
   const { hasRole } = useAuth()
-  const { usuarios, crearUsuario, editarUsuario, toggleUsuarioActivo } = useData()
+  const { usuarios, crearUsuario, editarUsuario, toggleUsuarioActivo, loadUsuarios } = useData()
   const navigate = useNavigate()
+
+  useEffect(() => { loadUsuarios() }, []) // eslint-disable-line
 
   const [formModal,  setFormModal]  = useState(false)
   const [editTarget, setEditTarget] = useState(null)
