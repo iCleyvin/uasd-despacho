@@ -18,22 +18,25 @@ const CATEGORIA_BADGE = {
 }
 
 function stockVariant(p) {
-  if (p.stock_actual <= 0) return 'danger'
-  if (p.stock_actual <= p.stock_minimo) return 'danger'
-  if (p.stock_actual <= p.stock_minimo * 2) return 'warning'
+  const actual = Number(p.stock_actual), min = Number(p.stock_minimo)
+  if (actual <= 0) return 'danger'
+  if (actual <= min) return 'danger'
+  if (actual <= min * 2) return 'warning'
   return 'success'
 }
 
 function stockLabel(p) {
-  if (p.stock_actual <= 0) return 'Sin stock'
-  if (p.stock_actual <= p.stock_minimo) return 'Crítico'
-  if (p.stock_actual <= p.stock_minimo * 2) return 'Bajo'
+  const actual = Number(p.stock_actual), min = Number(p.stock_minimo)
+  if (actual <= 0) return 'Sin stock'
+  if (actual <= min) return 'Crítico'
+  if (actual <= min * 2) return 'Bajo'
   return 'OK'
 }
 
 function StockBar({ producto }) {
-  const max = producto.stock_minimo * 4
-  const pct = Math.min(100, (producto.stock_actual / max) * 100)
+  const actual = Number(producto.stock_actual), min = Number(producto.stock_minimo)
+  const max = min * 4
+  const pct = Math.min(100, (actual / max) * 100)
   const color = stockVariant(producto)
   const barClass = {
     success: 'bg-green-500',
@@ -97,7 +100,7 @@ export default function Inventario() {
   const [saving,      setSaving]      = useState(false)
   const [successMsg,  setSuccessMsg]  = useState('')
 
-  const lowStock = productos.filter(p => p.stock_actual <= p.stock_minimo)
+  const lowStock = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
 
   function openEntrada(p) {
     setModalProd(p)
