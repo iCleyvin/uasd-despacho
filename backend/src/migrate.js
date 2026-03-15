@@ -355,6 +355,34 @@ async function run() {
   await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS matricula   VARCHAR(30)  DEFAULT NULL`)
   await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS chasis      VARCHAR(100) DEFAULT NULL`)
 
+  // Normalizar tipo y combustible a Title Case (idempotente)
+  console.log('▶ Normalizando tipo y combustible a Title Case...')
+  await db.query(`
+    UPDATE vehiculos SET tipo = CASE LOWER(tipo)
+      WHEN 'sedan'       THEN 'Sedan'
+      WHEN 'jeepeta'     THEN 'Jeepeta'
+      WHEN 'pickup'      THEN 'Pickup'
+      WHEN 'camion'      THEN 'Camion'
+      WHEN 'microbus'    THEN 'Microbus'
+      WHEN 'minibus'     THEN 'Minibus'
+      WHEN 'autobus'     THEN 'Autobus'
+      WHEN 'tren'        THEN 'Tren'
+      WHEN 'motocicleta' THEN 'Motocicleta'
+      ELSE tipo
+    END
+    WHERE tipo IS NOT NULL AND tipo != initcap(tipo)
+  `)
+  await db.query(`
+    UPDATE vehiculos SET combustible = CASE LOWER(combustible)
+      WHEN 'gasolina'  THEN 'Gasolina'
+      WHEN 'gasoil'    THEN 'Gasoil'
+      WHEN 'electrico' THEN 'Electrico'
+      WHEN 'hibrido'   THEN 'Hibrido'
+      ELSE combustible
+    END
+    WHERE combustible IS NOT NULL AND combustible != initcap(combustible)
+  `)
+
   const { rows: vu } = await db.query('SELECT COUNT(*) FROM usuarios')
   const { rows: vd } = await db.query('SELECT COUNT(*) FROM dependencias')
   const { rows: vv } = await db.query('SELECT COUNT(*) FROM vehiculos')
