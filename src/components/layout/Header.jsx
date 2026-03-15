@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { Menu, Bell, AlertTriangle } from 'lucide-react'
 import UserMenu from './UserMenu'
-import { PRODUCTOS } from '../../utils/mockData'
+import { useData } from '../../context/DataContext'
 
 export default function Header({ onMenuClick }) {
-  const lowStock = PRODUCTOS.filter(p => p.stock_actual <= p.stock_minimo)
+  const { productos } = useData()
+  const lowStock = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
 
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
