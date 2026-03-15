@@ -9,8 +9,8 @@ import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardBody } from '../components/ui/Card'
 
-const TIPO_OPTIONS = ['sedan', 'jeepeta', 'pickup', 'camion', 'microbus', 'minibus', 'autobus', 'tren', 'motocicleta', 'otro']
-const COMBUSTIBLE_OPTIONS = ['gasolina', 'gasoil', 'electrico', 'hibrido']
+const TIPO_OPTIONS = ['Sedan', 'Jeepeta', 'Pickup', 'Camion', 'Microbus', 'Minibus', 'Autobus', 'Tren', 'Motocicleta', 'Otro']
+const COMBUSTIBLE_OPTIONS = ['Gasolina', 'Gasoil', 'Electrico', 'Hibrido']
 
 const TIPO_ICON = {
   Sedan:       '🚗',
@@ -40,10 +40,10 @@ const EMPTY_FORM = {
   marca:          '',
   modelo:         '',
   anio:           new Date().getFullYear(),
-  tipo:           'sedan',
+  tipo:           'Sedan',
   color:          '',
   dependencia_id: '',
-  combustible:    'gasolina',
+  combustible:    'Gasolina',
 }
 
 export default function Vehiculos() {
@@ -434,15 +434,15 @@ export default function Vehiculos() {
             <div>
               <Select
                 label="Tipo"
-                value={TIPO_OPTIONS.includes(form.tipo) ? form.tipo : 'otro'}
-                onChange={e => field('tipo', e.target.value === 'otro' ? 'otro' : e.target.value)}
+                value={TIPO_OPTIONS.includes(form.tipo) ? form.tipo : 'Otro'}
+                onChange={e => field('tipo', e.target.value === 'Otro' ? 'Otro' : e.target.value)}
               >
                 {TIPO_OPTIONS.map(t => <option key={t} value={t}>{TIPO_ICON[t]} {t}</option>)}
               </Select>
-              {(!TIPO_OPTIONS.includes(form.tipo) || form.tipo === 'otro') && (
+              {(!TIPO_OPTIONS.includes(form.tipo) || form.tipo === 'Otro') && (
                 <Input
                   placeholder="Especifique el tipo…"
-                  value={form.tipo === 'otro' ? '' : form.tipo}
+                  value={form.tipo === 'Otro' ? '' : form.tipo}
                   onChange={e => field('tipo', e.target.value)}
                   className="mt-2"
                   autoFocus
