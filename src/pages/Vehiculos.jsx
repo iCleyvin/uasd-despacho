@@ -428,13 +428,24 @@ export default function Vehiculos() {
               value={form.color}
               onChange={e => field('color', e.target.value)}
             />
-            <Select
-              label="Tipo"
-              value={form.tipo}
-              onChange={e => field('tipo', e.target.value)}
-            >
-              {TIPO_OPTIONS.map(t => <option key={t} value={t}>{TIPO_ICON[t]} {t}</option>)}
-            </Select>
+            <div>
+              <Select
+                label="Tipo"
+                value={TIPO_OPTIONS.includes(form.tipo) ? form.tipo : 'otro'}
+                onChange={e => field('tipo', e.target.value === 'otro' ? 'otro' : e.target.value)}
+              >
+                {TIPO_OPTIONS.map(t => <option key={t} value={t}>{TIPO_ICON[t]} {t}</option>)}
+              </Select>
+              {(!TIPO_OPTIONS.includes(form.tipo) || form.tipo === 'otro') && (
+                <Input
+                  placeholder="Especifique el tipo…"
+                  value={form.tipo === 'otro' ? '' : form.tipo}
+                  onChange={e => field('tipo', e.target.value)}
+                  className="mt-2"
+                  autoFocus
+                />
+              )}
+            </div>
             <Select
               label="Combustible"
               value={form.combustible}
