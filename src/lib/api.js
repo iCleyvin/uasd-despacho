@@ -1,17 +1,10 @@
 const BASE = '/api'
 
-function getToken() {
-  return localStorage.getItem('uasd_token')
-}
-
 async function request(method, path, body) {
-  const headers = { 'Content-Type': 'application/json' }
-  const token = getToken()
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers,
+    credentials: 'include', // envía la cookie httpOnly automáticamente
+    headers: { 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 
@@ -29,9 +22,9 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  get:    (path)         => request('GET',    path),
-  post:   (path, body)   => request('POST',   path, body),
-  put:    (path, body)   => request('PUT',    path, body),
-  patch:  (path, body)   => request('PATCH',  path, body),
-  delete: (path)         => request('DELETE', path),
+  get:    (path)       => request('GET',    path),
+  post:   (path, body) => request('POST',   path, body),
+  put:    (path, body) => request('PUT',    path, body),
+  patch:  (path, body) => request('PATCH',  path, body),
+  delete: (path)       => request('DELETE', path),
 }

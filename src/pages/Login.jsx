@@ -11,7 +11,7 @@ export default function Login() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
-  const [form, setForm]     = useState({ email: 'admin@uasd.edu.do', password: 'Admin@2024' })
+  const [form, setForm]     = useState({ email: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)

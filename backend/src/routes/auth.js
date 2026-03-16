@@ -4,29 +4,42 @@ const jwt    = require('jsonwebtoken')
 const db     = require('../db')
 const { requireAuth } = require('../middleware/auth')
 
+const COOKIE_NAME = 'uasd_token'
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure:   process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge:   8 * 60 * 60 * 1000, // 8 horas en ms
+  path:     '/',
+}
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body
-  if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' })
+  if (!email || !password)
+    return res.status(400).json({ error: 'Email y contraseña requeridos' })
 
   const { rows } = await db.query(
-    'SELECT * FROM usuarios WHERE email = $1 AND activo = true', [email]
+    'SELECT * FROM usuarios WHERE email = $1 AND activo = true', [email.toLowerCase().trim()]
   )
   const user = rows[0]
-  if (!user) return res.status(401).json({ error: 'Credenciales inválidas' })
 
-  const ok = await bcrypt.compare(password, user.password_hash)
-  if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' })
+  // Comparación constante para evitar timing attacks (siempre ejecuta bcrypt)
+  const hash = user?.password_hash ?? '$2a$12$invalidhashtopreventtimingattack000000000000000000000'
+  const ok   = await bcrypt.compare(password, hash)
 
-  const token = jwt.sign(
-    { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN ?? '8h' }
-  )
+  if (!user || !ok)
+    return res.status(401).json({ error: 'Credenciales inválidas' })
 
-  res.json({
-    token,
-    user: { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
-  })
+  const payload = { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol }
+  const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN ?? '8h' })
+
+  res.cookie(COOKIE_NAME, token, COOKIE_OPTS)
+  res.json({ user: payload })
+})
+
+router.post('/logout', (_req, res) => {
+  res.clearCookie(COOKIE_NAME, { path: '/' })
+  res.json({ ok: true })
 })
 
 router.get('/me', requireAuth, async (req, res) => {

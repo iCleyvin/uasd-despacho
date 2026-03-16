@@ -76,7 +76,7 @@ router.post('/', requireAuth, async (req, res) => {
     const producto = pRows[0]
     if (!producto) throw Object.assign(new Error('Producto no encontrado'), { status: 404 })
     if (Number(cantidad) > Number(producto.stock_actual))
-      throw Object.assign(new Error(`Stock insuficiente. Disponible: ${producto.stock_actual} ${producto.unidad}`), { status: 400 })
+      throw Object.assign(new Error('Stock insuficiente para completar el despacho'), { status: 400 })
 
     // Crear despacho
     const { rows: dRows } = await client.query(`
