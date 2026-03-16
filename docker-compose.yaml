@@ -16,25 +16,25 @@ services:
       retries: 5
 
   api:
-    build: ./backend
+    image: ghcr.io/icleyvin/uasd-despacho-api:latest
     hostname: api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-uasd}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-uasd_despacho}
-      JWT_SECRET:   ${JWT_SECRET}
+      DATABASE_URL:  postgresql://${POSTGRES_USER:-uasd}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-uasd_despacho}
+      JWT_SECRET:    ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
-      PORT: 3000
+      CORS_ORIGIN:   ${CORS_ORIGIN}
+      NODE_ENV:      ${NODE_ENV:-production}
+      PORT:          3000
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "node --max-http-header-size=32768 src/migrate.js && node --max-http-header-size=32768 src/app.js"
+    command: sh -c "node src/migrate.js && node src/app.js"
 
   frontend:
-    build: .
+    image: ghcr.io/icleyvin/uasd-despacho-frontend:latest
     hostname: frontend
     restart: unless-stopped
-    ports:
-      - "3001:80"
     depends_on:
       - api
 
