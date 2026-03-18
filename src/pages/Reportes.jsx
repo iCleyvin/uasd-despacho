@@ -34,9 +34,15 @@ const CATEGORIA_BADGE = {
 }
 
 function downloadCSV(rows, headers, filename) {
-  const csv = [headers, ...rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`))]
-    .map(r => r.join(','))
-    .join('\n')
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const fecha = new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })
+  const meta = [
+    '"UNIVERSIDAD AUTÓNOMA DE SANTO DOMINGO (UASD)"',
+    '"Sistema de Despacho — Departamento de Suministros"',
+    `"Generado el: ${fecha}"`,
+    '',
+  ]
+  const csv = [...meta, headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\r\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')

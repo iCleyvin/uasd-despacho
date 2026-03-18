@@ -1,6 +1,13 @@
 function download(filename, headers, rows) {
   const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const lines = [headers.join(','), ...rows.map(r => r.map(esc).join(','))]
+  const fecha = new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })
+  const meta = [
+    '"UNIVERSIDAD AUTÓNOMA DE SANTO DOMINGO (UASD)"',
+    '"Sistema de Despacho — Departamento de Suministros"',
+    `"Generado el: ${fecha}"`,
+    '',
+  ]
+  const lines = [...meta, headers.join(','), ...rows.map(r => r.map(esc).join(','))]
   const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

@@ -4,27 +4,52 @@ import autoTable from 'jspdf-autotable'
 const PRIMARY = [30, 64, 175]   // blue-800
 const ALT_ROW = [248, 250, 252] // slate-50
 
-function crearDoc(titulo, orientacion = 'landscape') {
+async function loadLogo() {
+  try {
+    const res = await fetch('/logolog.png')
+    const blob = await res.blob()
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function crearDoc(titulo, orientacion = 'landscape') {
   const doc = new jsPDF({ orientation: orientacion, unit: 'mm', format: 'a4' })
   const fecha = new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })
+  const pageW = doc.internal.pageSize.width
+
+  const logoData = await loadLogo()
+  if (logoData) {
+    const logoH = 20
+    const logoW = 42
+    doc.addImage(logoData, 'PNG', pageW - logoW - 14, 6, logoW, logoH)
+  }
 
   doc.setFontSize(15)
   doc.setFont('helvetica', 'bold')
   doc.text('UASD — Sistema de Despacho', 14, 18)
 
-  doc.setFontSize(11)
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
-  doc.text(titulo, 14, 26)
+  doc.text('Departamento de Suministros', 14, 25)
 
-  doc.setFontSize(8)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text(titulo, 14, 32)
+
+  doc.setFontSize(7.5)
+  doc.setFont('helvetica', 'normal')
   doc.setTextColor(130)
-  doc.text(`Generado el ${fecha}`, 14, 33)
+  doc.text(`Generado el ${fecha}`, 14, 38)
   doc.setTextColor(0)
 
   return doc
 }
 
-function tabla(doc, head, body, startY = 38) {
+function tabla(doc, head, body, startY = 44) {
   autoTable(doc, {
     startY,
     head: [head],
@@ -48,8 +73,8 @@ function guardar(doc, nombre) {
 }
 
 // ─── Vehículos ───────────────────────────────────────────────────────────────
-export function exportVehiculosPDF(vehiculos) {
-  const doc = crearDoc(`Listado de Vehículos (${vehiculos.length} registros)`, 'landscape')
+export async function exportVehiculosPDF(vehiculos) {
+  const doc = await crearDoc(`Listado de Vehículos (${vehiculos.length} registros)`, 'landscape')
   tabla(doc,
     ['Placa', 'Ficha', 'Marca', 'Modelo', 'Año', 'Tipo', 'Combustible', 'Color', 'Dependencia', 'Estado'],
     vehiculos.map(v => [
@@ -69,8 +94,8 @@ export function exportVehiculosPDF(vehiculos) {
 }
 
 // ─── Inventario ───────────────────────────────────────────────────────────────
-export function exportInventarioPDF(productos) {
-  const doc = crearDoc(`Inventario de Productos (${productos.length} registros)`, 'portrait')
+export async function exportInventarioPDF(productos) {
+  const doc = await crearDoc(`Inventario de Productos (${productos.length} registros)`, 'portrait')
   tabla(doc,
     ['ID', 'Nombre', 'Categoría', 'Unidad', 'Stock actual', 'Stock mínimo', 'Precio unit.', 'Estado'],
     productos.map(p => [
@@ -88,8 +113,8 @@ export function exportInventarioPDF(productos) {
 }
 
 // ─── Dependencias ─────────────────────────────────────────────────────────────
-export function exportDependenciasPDF(dependencias) {
-  const doc = crearDoc(`Dependencias (${dependencias.length} registros)`, 'portrait')
+export async function exportDependenciasPDF(dependencias) {
+  const doc = await crearDoc(`Dependencias (${dependencias.length} registros)`, 'portrait')
   tabla(doc,
     ['Código', 'Nombre', 'Vehículos activos', 'Estado'],
     dependencias.map(d => [
@@ -108,8 +133,8 @@ const TABLA_LABELS_PDF = {
   dependencias: 'Dependencias', usuarios: 'Usuarios',
 }
 
-export function exportAuditoriaPDF(rows) {
-  const doc = crearDoc(`Registro de Auditoría (${rows.length} registros)`, 'landscape')
+export async function exportAuditoriaPDF(rows) {
+  const doc = await crearDoc(`Registro de Auditoría (${rows.length} registros)`, 'landscape')
   tabla(doc,
     ['Fecha/Hora', 'Usuario', 'Acción', 'Tabla', 'Registro ID'],
     rows.map(a => [
@@ -126,8 +151,8 @@ export function exportAuditoriaPDF(rows) {
 // ─── Reportes ─────────────────────────────────────────────────────────────────
 const MESES_PDF = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-export function exportReporteDiarioPDF(datos, fecha) {
-  const doc = crearDoc(`Consumo Diario — ${fecha} (${datos.length} productos)`, 'portrait')
+export async function exportReporteDiarioPDF(datos, fecha) {
+  const doc = await crearDoc(`Consumo Diario — ${fecha} (${datos.length} productos)`, 'portrait')
   tabla(doc,
     ['Producto', 'Categoría', 'Total', 'Unidad'],
     datos.map(d => [d.nombre, d.categoria ?? '—', Number(d.total).toFixed(0), d.unidad])
@@ -135,8 +160,8 @@ export function exportReporteDiarioPDF(datos, fecha) {
   guardar(doc, `consumo_diario_${fecha}`)
 }
 
-export function exportReporteMensualPDF(datos, mes, año) {
-  const doc = crearDoc(`Consumo Mensual — ${MESES_PDF[mes - 1]} ${año} (${datos.length} productos)`, 'portrait')
+export async function exportReporteMensualPDF(datos, mes, año) {
+  const doc = await crearDoc(`Consumo Mensual — ${MESES_PDF[mes - 1]} ${año} (${datos.length} productos)`, 'portrait')
   tabla(doc,
     ['Producto', 'Categoría', 'Total', 'Unidad', 'Nº Despachos'],
     datos.map(d => [d.nombre, d.categoria ?? '—', Number(d.total).toFixed(0), d.unidad, d.despachos])
@@ -144,7 +169,7 @@ export function exportReporteMensualPDF(datos, mes, año) {
   guardar(doc, `consumo_mensual_${año}-${String(mes).padStart(2, '0')}`)
 }
 
-export function exportReporteVehiculoPDF(datos, vehiculo, desde, hasta) {
+export async function exportReporteVehiculoPDF(datos, vehiculo, desde, hasta) {
   const titulo = vehiculo
     ? `Despachos — ${vehiculo.placa} ${vehiculo.marca} ${vehiculo.modelo} · ${desde} al ${hasta}`
     : `Despachos por Vehículo · ${desde} al ${hasta}`
@@ -163,8 +188,8 @@ export function exportReporteVehiculoPDF(datos, vehiculo, desde, hasta) {
 }
 
 // ─── Despachos ────────────────────────────────────────────────────────────────
-export function exportDespachosPDF(rows) {
-  const doc = crearDoc(`Historial de Despachos (${rows.length} registros)`, 'landscape')
+export async function exportDespachosPDF(rows) {
+  const doc = await crearDoc(`Historial de Despachos (${rows.length} registros)`, 'landscape')
   tabla(doc,
     ['#', 'Fecha', 'Placa', 'Vehículo', 'Dependencia', 'Producto', 'Cantidad', 'Receptor', 'Despachador'],
     rows.map(d => [
