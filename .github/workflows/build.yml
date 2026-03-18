@@ -51,11 +51,12 @@ jobs:
 
       - name: Trigger Coolify redeploy
         env:
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_TOKEN:    ${{ secrets.COOLIFY_TOKEN }}
           COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+          COOLIFY_URL:      ${{ secrets.COOLIFY_URL }}
         run: |
           curl -s -X POST \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
             -H "Content-Type: application/json" \
-            "http://10.0.0.90:8000/api/v1/deploy" \
+            "${COOLIFY_URL}/api/v1/deploy" \
             -d "{\"uuid\": \"${COOLIFY_APP_UUID}\", \"force\": true}"

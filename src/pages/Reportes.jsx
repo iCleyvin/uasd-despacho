@@ -84,7 +84,7 @@ function TabDiario() {
     return Object.values(map).sort((a, b) => b.total - a.total)
   }, [rows])
 
-  const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total }))
+  const chartData = useMemo(() => datos.map(d => ({ name: d.nombre, cantidad: d.total })), [datos])
 
   function exportarCSV() {
     downloadCSV(
@@ -201,11 +201,11 @@ function TabMensual({ productos }) {
     return Object.values(map).sort((a, b) => b.total - a.total)
   }, [rows])
 
-  const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total, despachos: d.despachos }))
+  const chartData = useMemo(() => datos.map(d => ({ name: d.nombre, cantidad: d.total, despachos: d.despachos })), [datos])
 
   function exportarCSV() {
     downloadCSV(
-      datos.map(d => [prefix, d.nombre, CATEGORIA_LABELS[d.categoria], d.total, d.unidad, d.despachos]),
+      datos.map(d => [prefix, d.nombre, CATEGORIA_LABELS[d.categoria] ?? d.categoria, d.total, d.unidad, d.despachos]),
       ['Mes', 'Producto', 'Categoría', 'Total', 'Unidad', 'Nº Despachos'],
       `consumo_mensual_${prefix}.csv`
     )
@@ -284,7 +284,7 @@ function TabMensual({ productos }) {
                 {datos.map((d, i) => (
                   <tr key={i}>
                     <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{d.nombre}</td>
-                    <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[d.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[d.categoria]}</Badge></td>
+                    <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[d.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[d.categoria] ?? d.categoria}</Badge></td>
                     <td className="px-4 py-3 text-right font-bold text-primary-600">{formatNumber(d.total, 0)}</td>
                     <td className="px-4 py-3 text-slate-500">{d.unidad}</td>
                     <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{d.despachos}</td>
@@ -469,7 +469,7 @@ function TabInventario({ productos }) {
 
   function exportarCSV() {
     downloadCSV(
-      productos.map(p => [p.nombre, CATEGORIA_LABELS[p.categoria], p.stock_actual, p.stock_minimo, p.unidad, stockLabel(p)]),
+      productos.map(p => [p.nombre, CATEGORIA_LABELS[p.categoria] ?? p.categoria, p.stock_actual, p.stock_minimo, p.unidad, stockLabel(p)]),
       ['Producto', 'Categoría', 'Stock Actual', 'Stock Mínimo', 'Unidad', 'Estado'],
       `inventario_${new Date().toISOString().slice(0, 10)}.csv`
     )
@@ -500,7 +500,7 @@ function TabInventario({ productos }) {
             {productos.map(p => (
               <tr key={p.id}>
                 <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{p.nombre}</td>
-                <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[p.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[p.categoria]}</Badge></td>
+                <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[p.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[p.categoria] ?? p.categoria}</Badge></td>
                 <td className="px-4 py-3 text-right font-bold text-primary-600">{formatNumber(p.stock_actual, 0)}</td>
                 <td className="px-4 py-3 text-right text-slate-500">{p.stock_minimo}</td>
                 <td className="px-4 py-3 text-slate-500">{p.unidad}</td>

@@ -41,20 +41,22 @@ export function DataProvider({ children }) {
     try {
       const res = await api.get('/productos')
       setProductos(res.data)
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('[reloadProductos]', err.message)
+    }
   }, [isAuthenticated])
 
   useEffect(() => { reload() }, [reload])
 
   // ── Despachos ────────────────────────────────────────────────────────────
-  async function loadDespachos(params = {}) {
+  const loadDespachos = useCallback(async (params = {}) => {
     const qs = new URLSearchParams(params).toString()
     const res = await api.get(`/despachos${qs ? '?' + qs : ''}`)
     setDespachos(res.data)
     return res
-  }
+  }, [])
 
-  async function crearDespacho(data) {
+  const crearDespacho = useCallback(async (data) => {
     const nuevo = await api.post('/despachos', data)
     setDespachos(prev => [nuevo, ...prev])
     // Actualización optimista inmediata para UI responsiva
@@ -66,96 +68,109 @@ export function DataProvider({ children }) {
     // Refrescar stock real del servidor en segundo plano —
     // garantiza que todos los usuarios vean el stock correcto
     // aunque haya otros despachos concurrentes en curso
-    api.get('/productos').then(res => setProductos(res.data)).catch(() => {})
+    api.get('/productos')
+      .then(res => setProductos(res.data))
+      .catch(err => console.error('[crearDespacho refresh]', err.message))
     return nuevo
-  }
+  }, [])
 
   // ── Inventario ───────────────────────────────────────────────────────────
-  async function registrarEntrada(productoId, cantidad, notas = '') {
+  const registrarEntrada = useCallback(async (productoId, cantidad, notas = '') => {
     const updated = await api.post(`/productos/${productoId}/entrada`, { cantidad, notas })
     setProductos(prev => prev.map(p => p.id === updated.id ? updated : p))
-  }
+  }, [])
 
-  async function editarProducto(id, data) {
+  const editarProducto = useCallback(async (id, data) => {
     const updated = await api.put(`/productos/${id}`, data)
     setProductos(prev => prev.map(p => p.id === id ? updated : p))
     return updated
-  }
+  }, [])
 
-  async function crearProducto(data) {
+  const crearProducto = useCallback(async (data) => {
     const nuevo = await api.post('/productos', data)
     setProductos(prev => [...prev, nuevo])
     return nuevo
-  }
+  }, [])
 
-  async function toggleProductoActivo(id) {
+  const toggleProductoActivo = useCallback(async (id) => {
     const updated = await api.patch(`/productos/${id}/toggle`)
     setProductos(prev => prev.map(p => p.id === id ? updated : p))
-  }
+  }, [])
+
+  const importarProductos = useCallback(async (items) => {
+    const result = await api.post('/productos/importar', { items })
+    setProductos(result.productos)
+    return result
+  }, [])
+
+  const loadMovimientos = useCallback(async (params = {}) => {
+    const qs = new URLSearchParams(params).toString()
+    return api.get(`/productos/movimientos${qs ? '?' + qs : ''}`)
+  }, [])
 
   // ── Vehículos ────────────────────────────────────────────────────────────
-  async function crearVehiculo(data) {
+  const crearVehiculo = useCallback(async (data) => {
     const nuevo = await api.post('/vehiculos', data)
     setVehiculos(prev => [...prev, nuevo])
     return nuevo
-  }
+  }, [])
 
-  async function editarVehiculo(id, data) {
+  const editarVehiculo = useCallback(async (id, data) => {
     const updated = await api.put(`/vehiculos/${id}`, data)
     setVehiculos(prev => prev.map(v => v.id === id ? updated : v))
-  }
+  }, [])
 
-  async function toggleVehiculoActivo(id) {
+  const toggleVehiculoActivo = useCallback(async (id) => {
     const updated = await api.patch(`/vehiculos/${id}/toggle`)
     setVehiculos(prev => prev.map(v => v.id === id ? updated : v))
-  }
+  }, [])
 
   // ── Dependencias ─────────────────────────────────────────────────────────
-  async function crearDependencia(data) {
+  const crearDependencia = useCallback(async (data) => {
     const nuevo = await api.post('/dependencias', data)
     setDependencias(prev => [...prev, nuevo])
     return nuevo
-  }
+  }, [])
 
-  async function editarDependencia(id, data) {
+  const editarDependencia = useCallback(async (id, data) => {
     const updated = await api.put(`/dependencias/${id}`, data)
     setDependencias(prev => prev.map(d => d.id === id ? updated : d))
-  }
+  }, [])
 
-  async function toggleDependenciaActivo(id) {
+  const toggleDependenciaActivo = useCallback(async (id) => {
     const updated = await api.patch(`/dependencias/${id}/toggle`)
     setDependencias(prev => prev.map(d => d.id === id ? updated : d))
-  }
+  }, [])
 
   // ── Usuarios ─────────────────────────────────────────────────────────────
-  async function loadUsuarios() {
+  const loadUsuarios = useCallback(async () => {
     const res = await api.get('/usuarios')
     setUsuarios(res.data)
-  }
+  }, [])
 
-  async function crearUsuario(data) {
+  const crearUsuario = useCallback(async (data) => {
     const nuevo = await api.post('/usuarios', data)
     setUsuarios(prev => [...prev, nuevo])
     return nuevo
-  }
+  }, [])
 
-  async function editarUsuario(id, data) {
+  const editarUsuario = useCallback(async (id, data) => {
     const updated = await api.put(`/usuarios/${id}`, data)
     setUsuarios(prev => prev.map(u => u.id === id ? updated : u))
-  }
+  }, [])
 
-  async function toggleUsuarioActivo(id) {
+  const toggleUsuarioActivo = useCallback(async (id) => {
     const updated = await api.patch(`/usuarios/${id}/toggle`)
     setUsuarios(prev => prev.map(u => u.id === id ? updated : u))
-  }
+  }, [])
 
   // ── Auditoría ─────────────────────────────────────────────────────────────
-  async function loadAuditoria(params = {}) {
+  const loadAuditoria = useCallback(async (params = {}) => {
     const qs = new URLSearchParams(params).toString()
     const res = await api.get(`/auditoria${qs ? '?' + qs : ''}`)
     setAuditoria(res.data)
     return res
-  }
+  }, [])
 
   return (
     <DataContext.Provider value={{
@@ -166,7 +181,7 @@ export function DataProvider({ children }) {
       // despachos
       crearDespacho,
       // inventario
-      registrarEntrada, crearProducto, editarProducto, toggleProductoActivo,
+      registrarEntrada, crearProducto, editarProducto, toggleProductoActivo, importarProductos, loadMovimientos,
       // vehículos
       crearVehiculo, editarVehiculo, toggleVehiculoActivo,
       // dependencias

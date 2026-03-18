@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Download, ChevronLeft, ChevronRight, X, Eye, Loader2, Printer } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -27,12 +27,14 @@ export default function Despachos() {
   const { productos } = useData()
   const { user, hasPermiso } = useAuth()
 
-  const [rows,    setRows]    = useState([])
-  const [total,   setTotal]   = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [page,    setPage]    = useState(1)
+  const [rows,     setRows]     = useState([])
+  const [total,    setTotal]    = useState(0)
+  const [loading,  setLoading]  = useState(false)
+  const [loadErr,  setLoadErr]  = useState(null)
+  const [page,     setPage]     = useState(1)
   const [selected, setSelected] = useState(null)
-  const [exporting, setExporting] = useState(false)
+  const [exporting,   setExporting]   = useState(false)
+  const [exportErr,   setExportErr]   = useState(null)
 
   const [filterFechaDesde, setFilterFechaDesde] = useState('')
   const [filterFechaHasta, setFilterFechaHasta] = useState('')
@@ -55,21 +57,30 @@ export default function Despachos() {
 
   const fetchData = useCallback(async (p = 1) => {
     setLoading(true)
+    setLoadErr(null)
     try {
       const res = await api.get('/despachos?' + new URLSearchParams(buildParams(p)))
       setRows(res.data)
       setTotal(res.total)
       setPage(p)
-    } catch { /* error manejado por api.js */ }
-    finally { setLoading(false) }
+    } catch (err) {
+      setLoadErr(err.message ?? 'Error al cargar despachos')
+    } finally {
+      setLoading(false)
+    }
   }, [buildParams])
 
-  // Refetch al montar y cuando cambian los filtros (con debounce para q)
-  useEffect(() => { fetchData(1) }, [filterFechaDesde, filterFechaHasta, filterProducto, filterNumero]) // eslint-disable-line
+  // Refetch cuando cambian los filtros. filterQ usa debounce de 350ms para no disparar en cada tecla;
+  // los demás filtros son selects/dates que refrescan al instante.
+  // fetchData es estable mientras no cambien los filtros (useCallback sobre buildParams).
+  const prevQRef = useRef(filterQ)
   useEffect(() => {
-    const t = setTimeout(() => fetchData(1), 350)
+    const qChanged = prevQRef.current !== filterQ
+    prevQRef.current = filterQ
+    const delay = qChanged ? 350 : 0
+    const t = setTimeout(() => fetchData(1), delay)
     return () => clearTimeout(t)
-  }, [filterQ]) // eslint-disable-line
+  }, [fetchData, filterQ, filterFechaDesde, filterFechaHasta, filterProducto, filterNumero])
 
   if (!hasPermiso('despachos.ver')) return <AccessDenied />
 
@@ -110,20 +121,23 @@ export default function Despachos() {
       a.download = `despachos_${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
-    } catch { /* silent */ }
-    finally { setExporting(false) }
+    } catch (err) {
+      setExportErr(err.message ?? 'Error al exportar CSV')
+    } finally { setExporting(false) }
   }
 
   async function exportPDF() {
     setExporting(true)
+    setExportErr(null)
     try {
       const qs = new URLSearchParams(buildParams(1))
       qs.delete('page'); qs.delete('limit')
       qs.set('limit', '9999')
       const res = await api.get('/despachos?' + qs)
       exportDespachosPDF(res.data)
-    } catch { /* silent */ }
-    finally { setExporting(false) }
+    } catch (err) {
+      setExportErr(err.message ?? 'Error al exportar PDF')
+    } finally { setExporting(false) }
   }
 
   return (
@@ -202,6 +216,13 @@ export default function Despachos() {
           </div>
         </CardBody>
       </Card>
+
+      {/* Error de carga o exportación */}
+      {(loadErr || exportErr) && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
+          ⚠ {loadErr ?? exportErr}
+        </div>
+      )}
 
       {/* Tabla */}
       <Card className="overflow-hidden">

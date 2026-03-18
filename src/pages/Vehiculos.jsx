@@ -250,11 +250,7 @@ export default function Vehiculos() {
                       <td className="px-4 py-3">
                         <Badge variant={v.activo ? 'success' : 'neutral'}>{v.activo ? 'Activo' : 'Inactivo'}</Badge>
                       </td>
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        {canEdit && (
-                          <Button variant="secondary" size="sm" icon={<Edit2 className="w-3.5 h-3.5" />} onClick={() => openEdit(v)}>Editar</Button>
-                        )}
-                      </td>
+                      <td className="px-4 py-3"></td>
                     </tr>
                   )
                 })}
@@ -316,20 +312,6 @@ export default function Vehiculos() {
                 {/* Dependencia */}
                 <p className="text-xs text-slate-400 truncate">{dep?.nombre ?? '—'}</p>
 
-                {/* Actions */}
-                {canEdit && (
-                  <div className="flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={<Edit2 className="w-3.5 h-3.5" />}
-                      className="flex-1"
-                      onClick={() => openEdit(v)}
-                    >
-                      Editar
-                    </Button>
-                  </div>
-                )}
               </CardBody>
             </Card>
           )

@@ -3,7 +3,7 @@ import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check,
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
-import { ROL_LABELS, formatDate } from '../utils/format'
+import { ROL_LABELS, formatDate, validatePassword } from '../utils/format'
 import { api } from '../lib/api'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -78,7 +78,7 @@ export default function Usuarios() {
   const { usuarios, crearUsuario, editarUsuario, toggleUsuarioActivo, loadUsuarios } = useData()
   const navigate = useNavigate()
 
-  useEffect(() => { loadUsuarios() }, []) // eslint-disable-line
+  useEffect(() => { loadUsuarios() }, [loadUsuarios])
 
   const [formModal,   setFormModal]   = useState(false)
   const [editTarget,  setEditTarget]  = useState(null)
@@ -135,7 +135,10 @@ export default function Usuarios() {
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = 'Correo inválido'
     if (!editTarget && !form.password) e.password = 'La contraseña es requerida para un nuevo usuario'
-    if (form.password && form.password.length < 6) e.password = 'Mínimo 6 caracteres'
+    if (form.password) {
+      const pwErr = validatePassword(form.password)
+      if (pwErr) e.password = pwErr
+    }
     const dup = usuarios.find(u => u.email === form.email && (!editTarget || u.id !== editTarget.id))
     if (dup) e.email = 'Ya existe un usuario con ese correo'
     return e

@@ -74,7 +74,7 @@ router.post('/', requireAuth, requirePermiso('vehiculos.editar'), validarVehicul
       INSERT INTO vehiculos (placa, marca, modelo, anio, tipo, color, dependencia_id, combustible, ficha_vieja, matricula, chasis)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *
     `, [placa.trim().toUpperCase(), marca, modelo, anio ?? null, tipo ?? null, color ?? '',
-        dependencia_id ?? null, combustible ?? 'gasolina',
+        dependencia_id ?? null, combustible ?? 'Gasolina',
         ficha_vieja || null, matricula || null, chasis || null])
 
     await addAudit({ accion: 'CREATE', tabla: 'vehiculos', registro_id: rows[0].id, usuario_id: req.user.id, datos_nuevo: req.body })
@@ -95,7 +95,7 @@ router.put('/:id', requireAuth, requirePermiso('vehiculos.editar'), [param('id')
         ficha_vieja=$9, matricula=$10, chasis=$11
       WHERE id=$12 RETURNING *
     `, [placa.trim().toUpperCase(), marca, modelo, anio ?? null, tipo ?? null, color ?? '',
-        dependencia_id ?? null, combustible ?? 'gasolina',
+        dependencia_id ?? null, combustible ?? 'Gasolina',
         ficha_vieja || null, matricula || null, chasis || null, req.params.id])
 
     if (!rows[0]) return res.status(404).json({ error: 'No encontrado' })
@@ -108,7 +108,7 @@ router.put('/:id', requireAuth, requirePermiso('vehiculos.editar'), [param('id')
   }
 })
 
-router.patch('/:id/toggle', requireAuth, requirePermiso('vehiculos.editar'), async (req, res) => {
+router.patch('/:id/toggle', requireAuth, requirePermiso('vehiculos.editar'), [param('id').isInt()], validar, async (req, res) => {
   try {
     const { rows: cur } = await db.query('SELECT activo FROM vehiculos WHERE id=$1', [req.params.id])
     if (!cur[0]) return res.status(404).json({ error: 'No encontrado' })

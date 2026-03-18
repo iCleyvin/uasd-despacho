@@ -28,11 +28,14 @@ export default function ResetPassword() {
     )
   }
 
+  const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     if (password !== confirm) return setError('Las contraseñas no coinciden')
-    if (password.length < 8)  return setError('Mínimo 8 caracteres')
+    if (!PASSWORD_REGEX.test(password))
+      return setError('Mínimo 8 caracteres, una mayúscula, un número y un símbolo')
 
     setLoading(true)
     try {

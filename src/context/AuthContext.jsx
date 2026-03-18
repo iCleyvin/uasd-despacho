@@ -55,14 +55,18 @@ export function AuthProvider({ children }) {
     return (user.permisos ?? []).includes(permiso)
   }, [user])
 
-  // Escuchar cierre forzado de sesión por el administrador
+  // Escuchar cierre forzado de sesión (admin) o expiración de JWT
   useEffect(() => {
     function handler() {
       localStorage.removeItem(USER_KEY)
       setUser(null)
     }
-    window.addEventListener('auth:kicked', handler)
-    return () => window.removeEventListener('auth:kicked', handler)
+    window.addEventListener('auth:kicked',  handler)
+    window.addEventListener('auth:expired', handler)
+    return () => {
+      window.removeEventListener('auth:kicked',  handler)
+      window.removeEventListener('auth:expired', handler)
+    }
   }, [])
 
   // Heartbeat de presencia: actualiza last_seen cada 60s mientras el usuario está activo

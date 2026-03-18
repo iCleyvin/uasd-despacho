@@ -1,10 +1,20 @@
-const router = require('express').Router()
-const bcrypt = require('bcryptjs')
-const crypto = require('crypto')
-const jwt    = require('jsonwebtoken')
-const db     = require('../db')
+const router    = require('express').Router()
+const bcrypt    = require('bcryptjs')
+const crypto    = require('crypto')
+const jwt       = require('jsonwebtoken')
+const rateLimit = require('express-rate-limit')
+const db        = require('../db')
 const { requireAuth, requireRole } = require('../middleware/auth')
 const { addAudit } = require('../middleware/audit')
+
+// Rate limit estricto para endpoints de reset de contraseña
+const resetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Intenta en 1 hora.' },
+})
 
 const COOKIE_NAME = 'uasd_token'
 const COOKIE_OPTS = {
@@ -38,7 +48,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' })
 
     const payload = { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol, token_version: user.token_version ?? 1 }
-    const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN ?? '8h' })
+    const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' })
 
     await db.query('UPDATE usuarios SET last_seen = NOW() WHERE id = $1', [user.id])
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS)
@@ -120,7 +130,7 @@ router.post('/generate-reset-token/:userId', requireAuth, requireRole('admin'), 
 })
 
 // ── Aplicar reset de contraseña (público, solo requiere token válido) ──────────
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', resetLimiter, async (req, res) => {
   try {
     const { token, password } = req.body
     if (!token || !password)
@@ -186,7 +196,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
 
     // Re-emitir cookie con nueva token_version para que la sesión actual siga activa
     const payload = { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol, token_version: updated[0].token_version }
-    const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN ?? '8h' })
+    const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' })
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS)
 
     await addAudit({ accion: 'UPDATE', tabla: 'usuarios', registro_id: user.id, usuario_id: req.user.id, datos_nuevo: { accion: 'cambio_contraseña_propia' } })

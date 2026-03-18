@@ -36,3 +36,16 @@ export const CATEGORIA_LABELS = {
   repuesto:           'Repuesto',
   otro:               'Otro',
 }
+
+// Valida la contraseña con las mismas reglas que el backend:
+// mínimo 8 caracteres, al menos 1 mayúscula, 1 número y 1 símbolo.
+// Retorna null si es válida, o un string con el mensaje de error.
+const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
+
+export function validatePassword(password) {
+  if (!password || password.length < 8)      return 'Mínimo 8 caracteres'
+  if (!/[A-Z]/.test(password))               return 'Debe incluir al menos una mayúscula'
+  if (!/\d/.test(password))                  return 'Debe incluir al menos un número'
+  if (!PASSWORD_REGEX.test(password))        return 'Debe incluir al menos un símbolo (!@#$%^&*…)'
+  return null
+}

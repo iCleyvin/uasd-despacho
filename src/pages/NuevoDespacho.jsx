@@ -22,16 +22,34 @@ const CATEGORIA_BADGE = {
 }
 
 const TIPO_ICON = {
-  sedan:       '🚗',
-  jeepeta:     '🚙',
-  pickup:      '🛻',
-  camion:      '🚛',
-  microbus:    '🚐',
-  minibus:     '🚌',
-  autobus:     '🚌',
-  tren:        '🚂',
-  motocicleta: '🏍',
-  otro:        '⚙',
+  Sedan:       '🚗',
+  Jeepeta:     '🚙',
+  Pickup:      '🛻',
+  Camion:      '🚛',
+  Microbus:    '🚐',
+  Minibus:     '🚌',
+  Autobus:     '🚌',
+  Tren:        '🚂',
+  Motocicleta: '🏍',
+  Otro:        '⚙',
+}
+
+// Detecta conflicto entre el tipo de combustible del producto y el del vehículo.
+// Retorna un string descriptivo si hay conflicto, null si no.
+function detectarConflictoCombustible(producto, vehiculoCombustible) {
+  if (!producto || producto.categoria !== 'combustible') return null
+  if (!vehiculoCombustible) return null
+  const n = producto.nombre.toLowerCase()
+  const prodEsGasolina = /gasolina|regular|premium|super/.test(n)
+  const prodEsGasoil   = /gasoil|diesel|gasoleo/.test(n)
+  if (vehiculoCombustible === 'Electrico')
+    return `Este vehículo es eléctrico y no debería recibir combustible`
+  if (vehiculoCombustible === 'Hibrido') return null // híbrido acepta combustible
+  if (vehiculoCombustible === 'Gasolina' && prodEsGasoil)
+    return `Este vehículo usa Gasolina pero estás despachando Gasoil`
+  if (vehiculoCombustible === 'Gasoil' && prodEsGasolina)
+    return `Este vehículo usa Gasoil pero estás despachando Gasolina`
+  return null
 }
 
 function stockVariant(producto) {
@@ -52,12 +70,124 @@ const EMPTY_FORM = {
   observaciones:   '',
 }
 
+function TicketView({ ticket, depTicket, onReset }) {
+  const { items, vehiculo, despachador } = ticket
+  const first = items[0]?.despacho
+  const last  = items[items.length - 1]?.despacho
+
+  const [printErr, setPrintErr] = useState(null)
+
+  async function handlePrintTicket() {
+    setPrintErr(null)
+    try { await exportTicketPDF({ items, vehiculo, despachador, depTicket }) }
+    catch (err) { setPrintErr(err.message ?? 'Error al generar el PDF') }
+  }
+
+  return (
+    <div className="max-w-lg mx-auto py-8 px-4">
+      <Card className="overflow-hidden">
+        <div className="bg-primary-600 px-6 py-5 flex items-center gap-3">
+          <CheckCircle className="w-8 h-8 text-white" />
+          <div>
+            <h1 className="text-white font-display font-bold text-xl">
+              {items.length === 1 ? 'Despacho Registrado' : `${items.length} Despachos Registrados`}
+            </h1>
+            <p className="text-primary-200 text-sm">
+              {items.length === 1
+                ? `#${String(first.id).padStart(6, '0')}`
+                : `#${String(first.id).padStart(6, '0')} — #${String(last.id).padStart(6, '0')}`}
+            </p>
+          </div>
+        </div>
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Fecha y hora</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{formatDateTime(first.fecha_despacho)}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Vehículo</p>
+              <p className="font-plate font-bold text-primary-600 text-lg leading-none">{vehiculo?.placa}</p>
+              <p className="text-xs text-slate-500">{vehiculo?.marca} {vehiculo?.modelo}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Solicitado por</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{first.solicitado_por}</p>
+            </div>
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Despachado por</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{despachador}</p>
+            </div>
+            {first.cedula_receptor && (
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Cédula receptor</p>
+                <p className="font-plate text-slate-900 dark:text-slate-100">{first.cedula_receptor}</p>
+              </div>
+            )}
+            {first.km_vehiculo && (
+              <div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Km vehículo</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(first.km_vehiculo, 0)} km</p>
+              </div>
+            )}
+            {depTicket && (
+              <div className="col-span-2">
+                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Dependencia</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{depTicket.nombre}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Productos */}
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-slate-50 dark:bg-slate-900/40 px-3 py-2 border-b border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wide">
+                Productos despachados
+              </p>
+            </div>
+            {items.map(({ despacho, producto }, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{producto?.nombre}</p>
+                  <p className="text-xs text-slate-400">#{String(despacho.id).padStart(6, '0')}</p>
+                </div>
+                <p className="font-bold text-primary-600 text-lg leading-none">
+                  {formatNumber(despacho.cantidad, 0)} <span className="text-xs font-normal text-slate-400">{despacho.unidad}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {first.observaciones && (
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Observaciones</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300">{first.observaciones}</p>
+            </div>
+          )}
+
+          {printErr && (
+            <p className="text-xs text-red-600 dark:text-red-400">⚠ {printErr}</p>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" icon={<Printer className="w-4 h-4" />} onClick={handlePrintTicket} className="flex-1">
+              Imprimir
+            </Button>
+            <Button variant="primary" icon={<RotateCcw className="w-4 h-4" />} onClick={onReset} className="flex-1">
+              Nuevo Despacho
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  )
+}
+
 export default function NuevoDespacho() {
   const { user, hasPermiso } = useAuth()
   const { vehiculos, productos, dependencias, crearDespacho, reloadProductos } = useData()
 
   // Refrescar stock al abrir el formulario para mostrar valores reales
-  useEffect(() => { reloadProductos() }, []) // eslint-disable-line
+  useEffect(() => { reloadProductos() }, [reloadProductos])
 
   const [form, setForm]                         = useState(EMPTY_FORM)
   const [lineas, setLineas]                     = useState([newLinea()])
@@ -88,15 +218,17 @@ export default function NuevoDespacho() {
   const firstProductoId = lineas[0]?.producto_id ?? ''
   useEffect(() => {
     if (!form.vehiculo_id || !firstProductoId) { setDespachoSemana(null); return }
+    const controller = new AbortController()
     const now  = new Date()
     const day  = now.getDay()
     const diff = day === 0 ? -6 : 1 - day
     const monday = new Date(now)
     monday.setDate(now.getDate() + diff)
     const fechaDesde = monday.toISOString().slice(0, 10)
-    api.get(`/despachos?vehiculo_id=${form.vehiculo_id}&producto_id=${firstProductoId}&fecha_desde=${fechaDesde}&limit=1`)
+    api.get(`/despachos?vehiculo_id=${form.vehiculo_id}&producto_id=${firstProductoId}&fecha_desde=${fechaDesde}&limit=1`, { signal: controller.signal })
       .then(res => setDespachoSemana(res.data?.[0] ?? null))
-      .catch(() => setDespachoSemana(null))
+      .catch(err => { if (err.name !== 'AbortError') setDespachoSemana(null) })
+    return () => controller.abort()
   }, [form.vehiculo_id, firstProductoId])
 
   // close dropdown on outside click
@@ -147,10 +279,19 @@ export default function NuevoDespacho() {
 
   function validate() {
     const e = {}
-    if (!form.vehiculo_id)       e.vehiculo_id    = 'Seleccione un vehículo'
+    if (!form.vehiculo_id)           e.vehiculo_id    = 'Seleccione un vehículo'
     if (!form.solicitado_por.trim()) e.solicitado_por = 'Campo requerido'
+
+    // Verificar conflictos de combustible
+    const hayConflictoCombustible = lineas.some(linea => {
+      const prod = productos.find(p => p.id === Number(linea.producto_id))
+      return !!detectarConflictoCombustible(prod, selectedVehiculo?.combustible)
+    })
+
     if (despachoSemana && !form.observaciones.trim())
       e.observaciones = 'Debe explicar el motivo del despacho repetido esta semana'
+    else if (hayConflictoCombustible && !form.observaciones.trim())
+      e.observaciones = 'Debe justificar el motivo del despacho de combustible incompatible con el vehículo'
 
     const usados = new Set()
     lineas.forEach((linea, idx) => {
@@ -194,7 +335,7 @@ export default function NuevoDespacho() {
           despachado_por:  user?.id ?? 2,
           solicitado_por:  form.solicitado_por,
           cedula_receptor: form.cedula_receptor || null,
-          km_vehiculo:     form.km_vehiculo ? Number(form.km_vehiculo) : null,
+          km_vehiculo:     form.km_vehiculo ? Math.round(Number(form.km_vehiculo)) : null,
           observaciones:   form.observaciones || null,
         })
         items.push({ despacho, producto: prod })
@@ -234,109 +375,12 @@ export default function NuevoDespacho() {
 
   // ── Ticket ────────────────────────────────────────────────────────────────
   if (ticket) {
-    const { items, vehiculo, despachador } = ticket
-    const depTicket = dependencias.find(d => d.id === vehiculo?.dependencia_id)
-    const first     = items[0]?.despacho
-    const last      = items[items.length - 1]?.despacho
-
-    async function handlePrintTicket() {
-      try { await exportTicketPDF({ items, vehiculo, despachador, depTicket }) }
-      catch { /* silent */ }
-    }
-
     return (
-      <div className="max-w-lg mx-auto py-8 px-4">
-        <Card className="overflow-hidden">
-          <div className="bg-primary-600 px-6 py-5 flex items-center gap-3">
-            <CheckCircle className="w-8 h-8 text-white" />
-            <div>
-              <h1 className="text-white font-display font-bold text-xl">
-                {items.length === 1 ? 'Despacho Registrado' : `${items.length} Despachos Registrados`}
-              </h1>
-              <p className="text-primary-200 text-sm">
-                {items.length === 1
-                  ? `#${String(first.id).padStart(6, '0')}`
-                  : `#${String(first.id).padStart(6, '0')} — #${String(last.id).padStart(6, '0')}`}
-              </p>
-            </div>
-          </div>
-          <CardBody className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Fecha y hora</p>
-                <p className="font-medium text-slate-900 dark:text-slate-100">{formatDateTime(first.fecha_despacho)}</p>
-              </div>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Vehículo</p>
-                <p className="font-plate font-bold text-primary-600 text-lg leading-none">{vehiculo?.placa}</p>
-                <p className="text-xs text-slate-500">{vehiculo?.marca} {vehiculo?.modelo}</p>
-              </div>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Solicitado por</p>
-                <p className="font-medium text-slate-900 dark:text-slate-100">{first.solicitado_por}</p>
-              </div>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Despachado por</p>
-                <p className="font-medium text-slate-900 dark:text-slate-100">{despachador}</p>
-              </div>
-              {first.cedula_receptor && (
-                <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Cédula receptor</p>
-                  <p className="font-plate text-slate-900 dark:text-slate-100">{first.cedula_receptor}</p>
-                </div>
-              )}
-              {first.km_vehiculo && (
-                <div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Km vehículo</p>
-                  <p className="font-medium text-slate-900 dark:text-slate-100">{formatNumber(first.km_vehiculo, 0)} km</p>
-                </div>
-              )}
-              {depTicket && (
-                <div className="col-span-2">
-                  <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Dependencia</p>
-                  <p className="font-medium text-slate-900 dark:text-slate-100">{depTicket.nombre}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Productos */}
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="bg-slate-50 dark:bg-slate-900/40 px-3 py-2 border-b border-slate-200 dark:border-slate-700">
-                <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wide">
-                  Productos despachados
-                </p>
-              </div>
-              {items.map(({ despacho, producto }, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 dark:border-slate-700 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{producto?.nombre}</p>
-                    <p className="text-xs text-slate-400">#{String(despacho.id).padStart(6, '0')}</p>
-                  </div>
-                  <p className="font-bold text-primary-600 text-lg leading-none">
-                    {formatNumber(despacho.cantidad, 0)} <span className="text-xs font-normal text-slate-400">{despacho.unidad}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {first.observaciones && (
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs uppercase font-medium mb-0.5">Observaciones</p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">{first.observaciones}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" icon={<Printer className="w-4 h-4" />} onClick={handlePrintTicket} className="flex-1">
-                Imprimir
-              </Button>
-              <Button variant="primary" icon={<RotateCcw className="w-4 h-4" />} onClick={resetForm} className="flex-1">
-                Nuevo Despacho
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+      <TicketView
+        ticket={ticket}
+        depTicket={dependencias.find(d => d.id === ticket.vehiculo?.dependencia_id)}
+        onReset={resetForm}
+      />
     )
   }
 
@@ -419,7 +463,25 @@ export default function NuevoDespacho() {
                     <p className="font-plate text-sm font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Matrícula: {selectedVehiculo.matricula}</p>
                   )}
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-1">{selectedVehiculo.marca} {selectedVehiculo.modelo} — {selectedVehiculo.anio}</p>
-                  <p className="text-xs text-slate-500">{selectedVehiculo.tipo} · {selectedVehiculo.color} · {dep?.nombre}</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+                    <span>{selectedVehiculo.tipo}</span>
+                    {selectedVehiculo.color && <><span>·</span><span>{selectedVehiculo.color}</span></>}
+                    {dep?.nombre && <><span>·</span><span>{dep.nombre}</span></>}
+                    {selectedVehiculo.combustible && (
+                      <>
+                        <span>·</span>
+                        <span className={`inline-flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded text-[11px] ${
+                          selectedVehiculo.combustible === 'Gasolina' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                          selectedVehiculo.combustible === 'Gasoil'   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                          selectedVehiculo.combustible === 'Electrico'? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                          selectedVehiculo.combustible === 'Hibrido'  ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' :
+                          'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        }`}>
+                          ⛽ {selectedVehiculo.combustible}
+                        </span>
+                      </>
+                    )}
+                  </p>
                 </div>
                 <button type="button" onClick={clearVehiculo} className="text-xs text-slate-500 hover:text-red-500 underline">
                   Cambiar
@@ -531,6 +593,24 @@ export default function NuevoDespacho() {
                     </div>
                   )}
 
+                  {/* Alerta de combustible incompatible */}
+                  {(() => {
+                    const conflicto = detectarConflictoCombustible(prod, selectedVehiculo?.combustible)
+                    if (!conflicto) return null
+                    return (
+                      <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
+                        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="font-semibold text-red-800 dark:text-red-300">⚠ Combustible incompatible</p>
+                          <p className="text-red-700 dark:text-red-400 mt-0.5">
+                            {conflicto}. El vehículo está registrado como <strong>{selectedVehiculo.combustible}</strong>.
+                            Debe justificar este despacho en el campo de observaciones.
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                   {/* Cantidad */}
                   <div className="flex gap-3 items-end">
                     <Input
@@ -597,6 +677,7 @@ export default function NuevoDespacho() {
               label="Km del vehículo"
               type="number"
               min="0"
+              step="1"
               placeholder="Ej: 45230"
               value={form.km_vehiculo}
               onChange={e => setForm(f => ({ ...f, km_vehiculo: e.target.value }))}
@@ -605,35 +686,56 @@ export default function NuevoDespacho() {
         </Card>
 
         {/* Observaciones */}
-        <Card className={despachoSemana ? 'border-amber-300 dark:border-amber-700' : ''}>
-          <CardBody>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Observaciones {despachoSemana && <span className="text-red-500">*</span>}
-              </label>
-              <textarea
-                rows={3}
-                placeholder={despachoSemana ? 'Explique el motivo del despacho repetido esta semana…' : 'Notas adicionales (opcional)'}
-                value={form.observaciones}
-                onChange={e => {
-                  setForm(f => ({ ...f, observaciones: e.target.value }))
-                  setErrors(ev => ({ ...ev, observaciones: undefined }))
-                }}
-                className={clsx(
-                  'w-full rounded-lg border px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all resize-none',
-                  errors.observaciones
-                    ? 'border-red-400 dark:border-red-600 focus:ring-red-500/30 focus:border-red-500'
-                    : despachoSemana
-                      ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-500/30 focus:border-amber-500'
-                      : 'border-slate-200 dark:border-slate-600 focus:ring-primary-600/40 focus:border-primary-600'
-                )}
-              />
-              {errors.observaciones && (
-                <p className="text-xs text-red-500 mt-0.5">{errors.observaciones}</p>
-              )}
-            </div>
-          </CardBody>
-        </Card>
+        {(() => {
+          const hayConflicto = lineas.some(linea => {
+            const prod = productos.find(p => p.id === Number(linea.producto_id))
+            return !!detectarConflictoCombustible(prod, selectedVehiculo?.combustible)
+          })
+          const esRequerido = despachoSemana || hayConflicto
+          const placeholder = hayConflicto
+            ? 'Justifique el motivo del despacho de combustible incompatible con el vehículo…'
+            : despachoSemana
+              ? 'Explique el motivo del despacho repetido esta semana…'
+              : 'Notas adicionales (opcional)'
+          return (
+            <Card className={clsx(
+              hayConflicto ? 'border-red-400 dark:border-red-600' : despachoSemana ? 'border-amber-300 dark:border-amber-700' : ''
+            )}>
+              <CardBody>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Observaciones {esRequerido && <span className="text-red-500">*</span>}
+                    {hayConflicto && (
+                      <span className="ml-2 text-xs font-normal text-red-600 dark:text-red-400">(requerido — combustible incompatible)</span>
+                    )}
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder={placeholder}
+                    value={form.observaciones}
+                    onChange={e => {
+                      setForm(f => ({ ...f, observaciones: e.target.value }))
+                      setErrors(ev => ({ ...ev, observaciones: undefined }))
+                    }}
+                    className={clsx(
+                      'w-full rounded-lg border px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all resize-none',
+                      errors.observaciones
+                        ? 'border-red-400 dark:border-red-600 focus:ring-red-500/30 focus:border-red-500'
+                        : hayConflicto
+                          ? 'border-red-400 dark:border-red-600 focus:ring-red-500/30 focus:border-red-500'
+                          : despachoSemana
+                            ? 'border-amber-400 dark:border-amber-600 focus:ring-amber-500/30 focus:border-amber-500'
+                            : 'border-slate-200 dark:border-slate-600 focus:ring-primary-600/40 focus:border-primary-600'
+                    )}
+                  />
+                  {errors.observaciones && (
+                    <p className="text-xs text-red-500 mt-0.5">{errors.observaciones}</p>
+                  )}
+                </div>
+              </CardBody>
+            </Card>
+          )
+        })()}
 
         {errors.submit && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">

@@ -20,16 +20,24 @@ services:
     hostname: api
     restart: unless-stopped
     environment:
-      DATABASE_URL:  postgresql://${POSTGRES_USER:-uasd}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-uasd_despacho}
-      JWT_SECRET:    ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
-      PORT:          3000
-      NODE_ENV:      production
+      DATABASE_URL:           postgresql://${POSTGRES_USER:-uasd}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-uasd_despacho}
+      JWT_SECRET:             ${JWT_SECRET}
+      JWT_EXPIRES_IN:         ${JWT_EXPIRES_IN:-8h}
+      PORT:                   3000
+      NODE_ENV:               production
       # COOKIE_SECURE=true solo si hay HTTPS. Dejar en false para HTTP en LAN.
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SECURE:          ${COOKIE_SECURE:-false}
+      CORS_ORIGIN:            ${CORS_ORIGIN}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     command: sh -c "node --max-http-header-size=32768 src/migrate.js && node --max-http-header-size=32768 src/app.js"
 
   frontend:
@@ -37,9 +45,19 @@ services:
     hostname: frontend
     restart: unless-stopped
     ports:
-      - "3001:80"
+      - "3001:80"    # HTTP  (sin certificado)
+      - "3443:443"   # HTTPS (requiere ssl/cert.pem y ssl/key.pem)
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro   # montar certificados TLS (solo lectura)
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
   backup:
     image: postgres:16-alpine
@@ -52,16 +70,18 @@ services:
       - ./backups:/backups
       - ./backup/backup.sh:/backup.sh:ro
       - ./backup/cleanup.sh:/cleanup.sh:ro
+      - ./backup/restore-test.sh:/restore-test.sh:ro
     depends_on:
       db:
         condition: service_healthy
-    # Ejecuta backup diario a las 02:00
+    # Backup diario 02:00 | cleanup mensual 03:00 día 1 | restore-test dominical 04:00
     entrypoint: >
       sh -c "
-        cp /backup.sh /tmp/backup.sh && sed -i 's/\r//' /tmp/backup.sh && chmod +x /tmp/backup.sh &&
-        cp /cleanup.sh /tmp/cleanup.sh && sed -i 's/\r//' /tmp/cleanup.sh && chmod +x /tmp/cleanup.sh &&
-        printf '0 2 * * * /tmp/backup.sh >> /proc/1/fd/1 2>&1\n0 3 1 * * /tmp/cleanup.sh >> /proc/1/fd/1 2>&1\n' > /etc/crontabs/root &&
-        echo '[backup] Servicio iniciado. Proximo backup: 02:00 diario.' &&
+        for f in backup cleanup restore-test; do
+          cp /$$f.sh /tmp/$$f.sh && sed -i 's/\r//' /tmp/$$f.sh && chmod +x /tmp/$$f.sh
+        done &&
+        printf '0 2 * * * /tmp/backup.sh >> /proc/1/fd/1 2>&1\n0 3 1 * * /tmp/cleanup.sh >> /proc/1/fd/1 2>&1\n0 4 * * 0 /tmp/restore-test.sh >> /proc/1/fd/1 2>&1\n' > /etc/crontabs/root &&
+        echo '[backup] Servicio iniciado. Backup: 02:00 diario | restore-test: 04:00 domingos.' &&
         crond -f -d 6
       "
 

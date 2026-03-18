@@ -1,5 +1,5 @@
 const router = require('express').Router()
-const { body, validationResult } = require('express-validator')
+const { body, param, validationResult } = require('express-validator')
 const db     = require('../db')
 const { requireAuth, requireRole, requirePermiso } = require('../middleware/auth')
 const { addAudit } = require('../middleware/audit')
@@ -62,7 +62,7 @@ router.put('/:id', requireAuth, requirePermiso('dependencias.editar'), validarDe
   }
 })
 
-router.patch('/:id/toggle', requireAuth, requirePermiso('dependencias.editar'), async (req, res) => {
+router.patch('/:id/toggle', requireAuth, requirePermiso('dependencias.editar'), [param('id').isInt()], validar, async (req, res) => {
   try {
     const { rows: cur } = await db.query('SELECT activo FROM dependencias WHERE id=$1', [req.params.id])
     if (!cur[0]) return res.status(404).json({ error: 'No encontrado' })

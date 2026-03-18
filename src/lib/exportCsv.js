@@ -35,6 +35,26 @@ export function exportInventarioCSV(productos) {
   )
 }
 
+export function exportMovimientosCSV(rows) {
+  download(
+    `movimientos_${hoy()}.csv`,
+    ['Fecha', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Stock antes', 'Stock después', 'Vehículo', 'Solicitado por', 'Registrado por', 'Notas'],
+    rows.map(r => [
+      r.fecha ? new Date(r.fecha).toLocaleString('es-DO') : '',
+      r.tipo === 'entrada' ? 'Entrada' : 'Despacho',
+      r.producto_nombre,
+      r.cantidad,
+      r.unidad,
+      r.stock_antes ?? '',
+      r.stock_despues ?? '',
+      r.vehiculo_placa ?? '',
+      r.solicitado_por ?? '',
+      r.usuario_nombre ?? '',
+      r.notas ?? '',
+    ])
+  )
+}
+
 export function exportDependenciasCSV(dependencias) {
   download(
     `dependencias_${hoy()}.csv`,

@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight } from 'lucide-react'
+import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight, Printer, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
+import Button from '../components/ui/Button'
 import { useData } from '../context/DataContext'
 import { api } from '../lib/api'
 import { formatDateTime, formatNumber } from '../utils/format'
+import { exportDespachoIndividualPDF } from '../lib/exportPdf'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 
@@ -92,11 +94,14 @@ export default function Dashboard() {
   const [consumoChart,   setConsumoChart]   = useState([])
   const [chartProductos, setChartProductos] = useState([])
   const [despachoDetalle, setDespachoDetalle] = useState(null)
+  const [printing,        setPrinting]        = useState(false)
+  const [printErr,        setPrintErr]        = useState(null)
 
   // Una sola llamada consolida despachos recientes + consumo diario
   useEffect(() => {
-    api.get('/reportes/dashboard')
-      .then(({ despachos_recientes, consumo_diario }) => {
+    async function loadDashboard() {
+      try {
+        const { despachos_recientes, consumo_diario } = await api.get('/reportes/dashboard')
         setDespachos(despachos_recientes)
 
         const combustibles = consumo_diario.filter(r => r.categoria === 'combustible')
@@ -118,19 +123,36 @@ export default function Dashboard() {
           byDate[fecha][r.producto] = Number(r.total)
         })
         setConsumoChart(days.map(d => byDate[d]))
-      })
-      .catch(() => {})
-  }, []) // eslint-disable-line
+      } catch (err) {
+        console.error('[Dashboard]', err.message)
+      }
+    }
+    loadDashboard()
+  }, [])
 
   const handleRowClick = useCallback(async (id) => {
+    setPrintErr(null)
     setDespachoDetalle({ id, _loading: true })
     try {
       const data = await api.get(`/despachos/${id}`)
       setDespachoDetalle(data)
-    } catch {
-      setDespachoDetalle(null)
+    } catch (err) {
+      setDespachoDetalle({ id, _error: err.message ?? 'Error al cargar despacho' })
     }
   }, [])
+
+  const handlePrint = useCallback(async () => {
+    if (!despachoDetalle || despachoDetalle._loading || despachoDetalle._error) return
+    setPrinting(true)
+    setPrintErr(null)
+    try {
+      await exportDespachoIndividualPDF(despachoDetalle)
+    } catch (err) {
+      setPrintErr(err.message ?? 'Error al generar PDF')
+    } finally {
+      setPrinting(false)
+    }
+  }, [despachoDetalle])
 
   const todayDespachos   = despachos.filter(d => d.fecha_despacho?.startsWith(TODAY))
   const todayCombustible = todayDespachos.filter(d => d.categoria === 'combustible').reduce((s, d) => s + Number(d.cantidad), 0)
@@ -256,7 +278,7 @@ export default function Dashboard() {
       {/* Modal detalle */}
       <Modal
         open={!!despachoDetalle}
-        onClose={() => setDespachoDetalle(null)}
+        onClose={() => { setDespachoDetalle(null); setPrintErr(null) }}
         title={despachoDetalle && !despachoDetalle._loading
           ? `Despacho #${String(despachoDetalle.id).padStart(6, '0')}`
           : 'Cargando…'}
@@ -264,8 +286,26 @@ export default function Dashboard() {
       >
         {despachoDetalle?._loading ? (
           <div className="px-6 py-10 text-center text-sm text-slate-400">Cargando detalle…</div>
+        ) : despachoDetalle?._error ? (
+          <div className="px-6 py-10 text-center text-sm text-red-500">{despachoDetalle._error}</div>
         ) : (
-          <DetalleDespacho despacho={despachoDetalle} />
+          <>
+            <DetalleDespacho despacho={despachoDetalle} />
+            <div className="px-6 pb-5 flex items-center justify-between gap-3">
+              {printErr && <p className="text-xs text-red-500">⚠ {printErr}</p>}
+              <div className="ml-auto">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                  disabled={printing}
+                  onClick={handlePrint}
+                >
+                  {printing ? 'Generando…' : 'Imprimir'}
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </Modal>
     </div>

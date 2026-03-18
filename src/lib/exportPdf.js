@@ -358,15 +358,26 @@ export async function exportDespachoIndividualPDF(d) {
   doc.text('COMPROBANTE DE DESPACHO', pageW / 2, 36, { align: 'center' })
   doc.setTextColor(0)
 
+  // Aviso: copia para uso interno
+  const bannerW = 142
+  const bannerX = (pageW - bannerW) / 2
+  doc.setFillColor(241, 245, 249)
+  doc.roundedRect(bannerX, 39, bannerW, 7, 1.5, 1.5, 'F')
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(80)
+  doc.text('COPIA PARA USO INTERNO — DEPARTAMENTO DE SUMINISTROS', pageW / 2, 44, { align: 'center' })
+  doc.setTextColor(0)
+
   doc.setFontSize(26)
   doc.setFont('helvetica', 'bold')
-  doc.text(`#${String(d.id).padStart(6, '0')}`, pageW / 2, 47, { align: 'center' })
+  doc.text(`#${String(d.id).padStart(6, '0')}`, pageW / 2, 56, { align: 'center' })
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(110)
   const fechaStr = d.fecha_despacho ? new Date(d.fecha_despacho).toLocaleString('es-DO') : '—'
-  doc.text(fechaStr, pageW / 2, 53, { align: 'center' })
+  doc.text(fechaStr, pageW / 2, 63, { align: 'center' })
   doc.setTextColor(0)
 
   // ── Tabla de detalles ────────────────────────────────────────────────────
@@ -385,7 +396,7 @@ export async function exportDespachoIndividualPDF(d) {
   ]
 
   autoTable(doc, {
-    startY: 59,
+    startY: 69,
     body: details,
     theme: 'plain',
     columnStyles: {
@@ -431,7 +442,7 @@ export async function exportDespachoIndividualPDF(d) {
   doc.setFontSize(7)
   doc.setTextColor(160)
   doc.text(
-    'Este documento es un comprobante oficial de despacho · UASD — Departamento de Suministros',
+    'Copia para uso interno · Departamento de Suministros · UASD — Prohibida su circulación externa',
     pageW / 2, pageH - 10, { align: 'center' }
   )
 
@@ -456,4 +467,147 @@ export async function exportDespachosPDF(rows) {
     ])
   )
   guardar(doc, 'despachos')
+}
+
+// ─── Historial combinado de movimientos ───────────────────────────────────────
+export async function exportMovimientosPDF(rows) {
+  const doc = await crearDoc(`Historial de Movimientos (${rows.length} registros)`, 'landscape')
+  tabla(doc,
+    ['Fecha', 'Tipo', 'Producto', 'Cantidad', 'Unidad', 'Stock antes', 'Stock después', 'Vehículo', 'Usuario'],
+    rows.map(r => [
+      r.fecha ? new Date(r.fecha).toLocaleString('es-DO') : '—',
+      r.tipo === 'entrada' ? 'Entrada' : 'Despacho',
+      r.producto_nombre ?? '—',
+      Number(r.cantidad).toFixed(0),
+      r.unidad ?? '',
+      r.stock_antes  != null ? Number(r.stock_antes).toFixed(0)  : '—',
+      r.stock_despues != null ? Number(r.stock_despues).toFixed(0) : '—',
+      r.vehiculo_placa ?? '—',
+      r.usuario_nombre ?? '—',
+    ])
+  )
+  guardar(doc, 'movimientos')
+}
+
+// ─── Comprobante de movimiento de inventario ──────────────────────────────────
+const TIPO_LABELS = { entrada: 'ENTRADA DE INVENTARIO', despacho: 'DESPACHO DE COMBUSTIBLE / SUMINISTRO' }
+
+export async function exportMovimientoPDF(m) {
+  const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.width
+  const pageH = doc.internal.pageSize.height
+  const esEntrada = m.tipo === 'entrada'
+
+  // ── Encabezado ───────────────────────────────────────────────────────────
+  const logoData = await loadLogo()
+  if (logoData) doc.addImage(logoData, 'PNG', pageW - 36, 7, 22, 22)
+
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.text('UNIVERSIDAD AUTÓNOMA DE SANTO DOMINGO', 14, 16)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(80)
+  doc.text('Departamento de Suministros — Sistema de Despacho', 14, 22)
+  doc.setTextColor(0)
+
+  doc.setDrawColor(...PRIMARY)
+  doc.setLineWidth(0.8)
+  doc.line(14, 27, pageW - 14, 27)
+
+  // ── Título ───────────────────────────────────────────────────────────────
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...PRIMARY)
+  doc.text(TIPO_LABELS[m.tipo] ?? 'MOVIMIENTO DE INVENTARIO', pageW / 2, 36, { align: 'center' })
+  doc.setTextColor(0)
+
+  // Aviso: copia para uso interno
+  const bannerW = 142
+  const bannerX = (pageW - bannerW) / 2
+  doc.setFillColor(241, 245, 249)
+  doc.roundedRect(bannerX, 39, bannerW, 7, 1.5, 1.5, 'F')
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(80)
+  doc.text('COPIA PARA USO INTERNO — DEPARTAMENTO DE SUMINISTROS', pageW / 2, 44, { align: 'center' })
+  doc.setTextColor(0)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(110)
+  const fechaStr = m.fecha ? new Date(m.fecha).toLocaleString('es-DO') : '—'
+  doc.text(fechaStr, pageW / 2, 53, { align: 'center' })
+  doc.setTextColor(0)
+
+  // ── Tabla de detalles ────────────────────────────────────────────────────
+  const details = [
+    ['Producto',   m.producto_nombre ?? '—'],
+    ['Tipo',       esEntrada ? 'Entrada de inventario' : 'Despacho'],
+    ['Cantidad',   `${Number(m.cantidad).toFixed(0)} ${m.unidad}`],
+    ...(esEntrada
+      ? [
+          ['Stock anterior',  m.stock_antes  != null ? `${Number(m.stock_antes).toFixed(0)} ${m.unidad}`  : '—'],
+          ['Stock después',   m.stock_despues != null ? `${Number(m.stock_despues).toFixed(0)} ${m.unidad}` : '—'],
+        ]
+      : [
+          ['Vehículo',        m.vehiculo_placa ?? '—'],
+          ['Solicitado por',  m.solicitado_por ?? '—'],
+        ]),
+    ['Registrado por', m.usuario_nombre ?? '—'],
+    ...(m.notas ? [['Notas / Observaciones', m.notas]] : []),
+  ]
+
+  autoTable(doc, {
+    startY: 59,
+    body: details,
+    theme: 'plain',
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 58, fillColor: [241, 245, 249], textColor: 60 },
+      1: { cellWidth: 'auto' },
+    },
+    styles: { fontSize: 10.5, cellPadding: { top: 4, bottom: 4, left: 5, right: 5 } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Área de firma (solo para despachos) ─────────────────────────────────
+  if (!esEntrada) {
+    const finalY = doc.lastAutoTable.finalY
+    const sigY   = finalY + 28
+    const col    = (pageW - 28) / 2
+    const lx     = 14
+    const rx     = 14 + col + 14
+
+    doc.setDrawColor(100)
+    doc.setLineWidth(0.5)
+    doc.line(lx, sigY, lx + col, sigY)
+    doc.line(rx, sigY, rx + col, sigY)
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Despachador', lx + col / 2, sigY + 6, { align: 'center' })
+    doc.text('Receptor / Solicitante', rx + col / 2, sigY + 6, { align: 'center' })
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(110)
+    doc.text(m.usuario_nombre ?? '', lx + col / 2, sigY + 11, { align: 'center' })
+    doc.text('Firma y sello', lx + col / 2, sigY + 16, { align: 'center' })
+    doc.text(m.solicitado_por ?? '', rx + col / 2, sigY + 11, { align: 'center' })
+    doc.text('Firma y número de cédula', rx + col / 2, sigY + 16, { align: 'center' })
+    doc.setTextColor(0)
+  }
+
+  // ── Pie de página ────────────────────────────────────────────────────────
+  doc.setFontSize(7)
+  doc.setTextColor(160)
+  doc.text(
+    'Copia para uso interno · Departamento de Suministros · UASD — Prohibida su circulación externa',
+    pageW / 2, pageH - 10, { align: 'center' }
+  )
+
+  const tipo  = m.tipo === 'entrada' ? 'entrada' : 'despacho'
+  const fecha = (m.fecha ?? '').slice(0, 10).replace(/-/g, '')
+  doc.save(`${tipo}_${fecha}_${String(m.id).padStart(6, '0')}.pdf`)
 }

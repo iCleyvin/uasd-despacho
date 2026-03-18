@@ -10,7 +10,7 @@ function validar(req, res, next) {
 }
 
 const TABLAS_VALIDAS   = ['despachos', 'productos', 'vehiculos', 'dependencias', 'usuarios']
-const ACCIONES_VALIDAS = ['CREATE', 'UPDATE', 'DELETE', 'ENTRADA']
+const ACCIONES_VALIDAS = ['CREATE', 'UPDATE', 'DELETE', 'ENTRADA', 'IMPORTAR']
 
 const validarFiltros = [
   query('tabla').optional().trim().isIn(TABLAS_VALIDAS).withMessage('Tabla inválida'),

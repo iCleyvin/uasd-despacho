@@ -23,7 +23,24 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 
-# Archivos de seed/datos de prueba
+# Backups generados (no versionar datos)
+backups/
+
+# Certificados TLS (gestionados por ssl/.gitignore, pero redundancia aquí)
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# Scripts locales de migración/herramientas
 seed_despachos.py
 seed_combustible.py
 import_excel.py
+ax_inventario_sync.py
+buscar_categorias.py
+crear_variantes_univ.py
+generar_inventario_dx.py
+import_sin_ficha.py
+test_api.py
+generate-tech-doc.cjs
+*.xlsx
+*.pdf

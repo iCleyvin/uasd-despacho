@@ -17,10 +17,11 @@ import AccessDenied from '../components/ui/AccessDenied'
 const PAGE_SIZE = 20
 
 const ACCION_BADGE = {
-  CREATE:  'success',
-  UPDATE:  'info',
-  DELETE:  'danger',
-  ENTRADA: 'gold',
+  CREATE:   'success',
+  UPDATE:   'info',
+  DELETE:   'danger',
+  ENTRADA:  'gold',
+  IMPORTAR: 'success',
 }
 
 const TABLA_LABELS = {
@@ -39,6 +40,7 @@ export default function Auditoria() {
   const [rows,      setRows]      = useState([])
   const [total,     setTotal]     = useState(0)
   const [loading,   setLoading]   = useState(false)
+  const [loadErr,   setLoadErr]   = useState(null)
   const [page,      setPage]      = useState(1)
   const [selected,  setSelected]  = useState(null)
   const [exporting,    setExporting]    = useState(false)
@@ -50,7 +52,7 @@ export default function Auditoria() {
   const [filterAccion,  setFilterAccion]  = useState('')
   const [filterTabla,   setFilterTabla]   = useState('')
 
-  useEffect(() => { loadUsuarios() }, []) // eslint-disable-line
+  useEffect(() => { loadUsuarios() }, [loadUsuarios])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -66,16 +68,20 @@ export default function Auditoria() {
 
   const fetchData = useCallback(async (p = 1) => {
     setLoading(true)
+    setLoadErr(null)
     try {
       const res = await api.get('/auditoria?' + new URLSearchParams(buildParams(p)))
       setRows(res.data)
       setTotal(res.total)
       setPage(p)
-    } catch { /* error manejado por api.js */ }
-    finally { setLoading(false) }
+    } catch (err) {
+      setLoadErr(err.message ?? 'Error al cargar auditoría')
+    } finally {
+      setLoading(false)
+    }
   }, [buildParams])
 
-  useEffect(() => { fetchData(1) }, [filterUsuario, filterDesde, filterHasta, filterAccion, filterTabla]) // eslint-disable-line
+  useEffect(() => { fetchData(1) }, [fetchData])
 
   if (!hasPermiso('auditoria.ver')) return <AccessDenied />
 
@@ -206,6 +212,13 @@ export default function Auditoria() {
           )}
         </CardBody>
       </Card>
+
+      {/* Error de carga */}
+      {loadErr && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
+          ⚠ {loadErr}
+        </div>
+      )}
 
       {/* Tabla */}
       <Card className="overflow-hidden">

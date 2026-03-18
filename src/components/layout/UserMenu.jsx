@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { api } from '../../lib/api'
-import { ROL_LABELS } from '../../utils/format'
+import { ROL_LABELS, validatePassword } from '../../utils/format'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
@@ -18,10 +18,9 @@ function ChangePasswordModal({ open, onClose }) {
 
   function validate() {
     const e = {}
-    if (!form.actual)            e.actual    = 'Requerido'
-    if (form.nueva.length < 8)   e.nueva     = 'Mínimo 8 caracteres'
-    if (!/[A-Z]/.test(form.nueva)) e.nueva   = 'Debe tener al menos una mayúscula'
-    if (!/[0-9]/.test(form.nueva)) e.nueva   = 'Debe tener al menos un número'
+    if (!form.actual) e.actual = 'Requerido'
+    const pwErr = validatePassword(form.nueva)
+    if (pwErr) e.nueva = pwErr
     if (form.nueva !== form.confirmar) e.confirmar = 'Las contraseñas no coinciden'
     return e
   }
@@ -126,12 +125,9 @@ export default function UserMenu() {
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
             >
               {theme === 'dark'
-                ? <Sun className="w-4 h-4 text-slate-400" />
-                : <Moon className="w-4 h-4 text-slate-400" />}
-              <span className="flex-1 text-left">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>
-              <div className={clsx('w-9 h-5 rounded-full transition-colors relative', theme === 'dark' ? 'bg-primary-600' : 'bg-slate-200')}>
-                <span className={clsx('absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform', theme === 'dark' ? 'translate-x-4' : 'translate-x-0.5')} />
-              </div>
+                ? <Sun className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                : <Moon className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
             </button>
 
             {/* Change password */}

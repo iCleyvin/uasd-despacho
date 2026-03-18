@@ -47,8 +47,10 @@ function buildWhere(query, userRol, userId) {
   if (query.fecha_desde) { params.push(query.fecha_desde); conditions.push(`d.fecha_despacho >= $${params.length}`) }
   if (query.fecha_hasta) { params.push(query.fecha_hasta + 'T23:59:59'); conditions.push(`d.fecha_despacho <= $${params.length}`) }
   if (query.q) {
-    params.push(`%${query.q}%`)
-    conditions.push(`(v.placa ILIKE $${params.length} OR v.marca ILIKE $${params.length} OR d.solicitado_por ILIKE $${params.length})`)
+    // Escapar % y _ para que no actúen como comodines LIKE involuntarios
+    const escaped = query.q.replace(/[%_\\]/g, c => `\\${c}`)
+    params.push(`%${escaped}%`)
+    conditions.push(`(v.placa ILIKE $${params.length} ESCAPE '\\' OR v.marca ILIKE $${params.length} ESCAPE '\\' OR d.solicitado_por ILIKE $${params.length} ESCAPE '\\')`)
   }
   return { where: conditions.length ? 'WHERE ' + conditions.join(' AND ') : '', params }
 }
@@ -201,15 +203,16 @@ router.post('/', requireAuth, requirePermiso('despachos.crear'), validarDespacho
       'UPDATE productos SET stock_actual = $1 WHERE id = $2', [stockNuevo, producto_id]
     )
 
-    await client.query('COMMIT')
-
-    await addAudit({ accion: 'CREATE', tabla: 'despachos', registro_id: despacho.id, usuario_id: req.user.id, datos_nuevo: req.body })
+    // Auditoría dentro de la transacción — garantiza consistencia si el servidor muere tras el COMMIT
+    await addAudit({ accion: 'CREATE', tabla: 'despachos', registro_id: despacho.id, usuario_id: req.user.id, datos_nuevo: req.body, client })
     await addAudit({ accion: 'UPDATE', tabla: 'productos',  registro_id: producto_id,  usuario_id: req.user.id,
-      datos_antes: { stock_actual: stockAntes }, datos_nuevo: { stock_actual: stockNuevo } })
+      datos_antes: { stock_actual: stockAntes }, datos_nuevo: { stock_actual: stockNuevo }, client })
+
+    await client.query('COMMIT')
 
     res.status(201).json(despacho)
   } catch (err) {
-    await client.query('ROLLBACK')
+    try { await client.query('ROLLBACK') } catch (_) { /* ignorar error de rollback */ }
     console.error('[despachos POST /]', err.message)
     res.status(err.status ?? 500).json({ error: err.message })
   } finally {

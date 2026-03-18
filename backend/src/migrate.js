@@ -302,19 +302,18 @@ async function run() {
   // Usuarios
   const { rows: existingUsers } = await db.query('SELECT COUNT(*) FROM usuarios')
   if (Number(existingUsers[0].count) === 0) {
-    console.log('▶ Insertando usuarios iniciales...')
-    const users = [
-      { nombre: 'Admin',  apellido: 'Sistema', email: 'admin@uasd.edu.do',  password: 'Admin@2026',    rol: 'admin' },
-      { nombre: 'Juan',   apellido: 'Perez',   email: 'juan@uasd.edu.do',   password: 'Juan@2026',     rol: 'despachador' },
-      { nombre: 'Maria',  apellido: 'Gomez',   email: 'maria@uasd.edu.do',  password: 'Maria@2026',    rol: 'supervisor' },
-    ]
-    for (const u of users) {
-      const hash = await bcrypt.hash(u.password, 12)
-      await db.query(
-        'INSERT INTO usuarios (nombre, apellido, email, password_hash, rol) VALUES ($1,$2,$3,$4,$5)',
-        [u.nombre, u.apellido, u.email, hash, u.rol]
-      )
+    console.log('▶ Insertando usuario administrador inicial...')
+    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD
+    if (!adminPassword) {
+      console.error('[migrate] ERROR: La variable ADMIN_INITIAL_PASSWORD es requerida para la primera ejecución.')
+      process.exit(1)
     }
+    const hash = await bcrypt.hash(adminPassword, 12)
+    await db.query(
+      'INSERT INTO usuarios (nombre, apellido, email, password_hash, rol) VALUES ($1,$2,$3,$4,$5)',
+      ['Admin', 'Sistema', 'admin@uasd.edu.do', hash, 'admin']
+    )
+    console.log('▶ Usuario admin creado. Email: admin@uasd.edu.do — cambia la contraseña tras el primer login.')
   }
 
   // Dependencias
@@ -391,6 +390,84 @@ async function run() {
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_stock_no_negativo') THEN
         ALTER TABLE productos ADD CONSTRAINT chk_stock_no_negativo CHECK (stock_actual >= 0);
       END IF;
+    END $$
+  `)
+
+  // ── BIGSERIAL: ampliar todas las secuencias de INT a BIGINT ──────────────────
+  // Previene overflow en producción a largo plazo (SERIAL max = 2.1 billones).
+  // Es idempotente: si el tipo ya es BIGINT, no hace nada.
+  await db.query(`
+    DO $$ DECLARE
+      tbl  text;
+      seq  text;
+    BEGIN
+      FOREACH tbl IN ARRAY ARRAY['usuarios','dependencias','vehiculos','productos','despachos','auditoria']
+      LOOP
+        -- Solo actuar si la columna id sigue siendo INTEGER (no BIGINT)
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = tbl AND column_name = 'id' AND data_type = 'integer'
+        ) THEN
+          EXECUTE format('ALTER TABLE %I ALTER COLUMN id TYPE BIGINT', tbl);
+          seq := pg_get_serial_sequence(tbl, 'id');
+          IF seq IS NOT NULL THEN
+            EXECUTE 'ALTER SEQUENCE ' || seq || ' AS BIGINT';
+          END IF;
+        END IF;
+      END LOOP;
+    END $$
+  `)
+
+  // ── Ampliar también las columnas FK que apuntan a esos ids ───────────────────
+  await db.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='vehiculos' AND column_name='dependencia_id' AND data_type='integer') THEN
+        ALTER TABLE vehiculos ALTER COLUMN dependencia_id TYPE BIGINT;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='despachos' AND column_name='vehiculo_id' AND data_type='integer') THEN
+        ALTER TABLE despachos ALTER COLUMN vehiculo_id  TYPE BIGINT;
+        ALTER TABLE despachos ALTER COLUMN producto_id  TYPE BIGINT;
+        ALTER TABLE despachos ALTER COLUMN despachado_por TYPE BIGINT;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='auditoria' AND column_name='usuario_id' AND data_type='integer') THEN
+        ALTER TABLE auditoria ALTER COLUMN usuario_id   TYPE BIGINT;
+        ALTER TABLE auditoria ALTER COLUMN registro_id  TYPE BIGINT;
+      END IF;
+    END $$
+  `)
+
+  // ── ON DELETE SET NULL en FK de despachos y vehiculos ────────────────────────
+  // Sin esto, borrar un vehículo/producto/usuario lanza error de FK constraint.
+  // SET NULL preserva el historial de despachos con referencias nulas (más seguro que CASCADE).
+  await db.query(`
+    DO $$ BEGIN
+      -- vehiculos.dependencia_id
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vehiculos_dependencia_id_fkey') THEN
+        ALTER TABLE vehiculos DROP CONSTRAINT vehiculos_dependencia_id_fkey;
+      END IF;
+      ALTER TABLE vehiculos ADD CONSTRAINT vehiculos_dependencia_id_fkey
+        FOREIGN KEY (dependencia_id) REFERENCES dependencias(id) ON DELETE SET NULL;
+
+      -- despachos.vehiculo_id
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'despachos_vehiculo_id_fkey') THEN
+        ALTER TABLE despachos DROP CONSTRAINT despachos_vehiculo_id_fkey;
+      END IF;
+      ALTER TABLE despachos ADD CONSTRAINT despachos_vehiculo_id_fkey
+        FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE SET NULL;
+
+      -- despachos.producto_id
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'despachos_producto_id_fkey') THEN
+        ALTER TABLE despachos DROP CONSTRAINT despachos_producto_id_fkey;
+      END IF;
+      ALTER TABLE despachos ADD CONSTRAINT despachos_producto_id_fkey
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL;
+
+      -- despachos.despachado_por
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'despachos_despachado_por_fkey') THEN
+        ALTER TABLE despachos DROP CONSTRAINT despachos_despachado_por_fkey;
+      END IF;
+      ALTER TABLE despachos ADD CONSTRAINT despachos_despachado_por_fkey
+        FOREIGN KEY (despachado_por) REFERENCES usuarios(id) ON DELETE SET NULL;
     END $$
   `)
 

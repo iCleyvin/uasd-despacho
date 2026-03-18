@@ -1,0 +1,5 @@
+# Nunca versionar los certificados ni la clave privada
+*.pem
+*.key
+*.crt
+*.p12

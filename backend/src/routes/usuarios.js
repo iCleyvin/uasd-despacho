@@ -25,6 +25,14 @@ const PERMISOS_POR_ROL = {
   ],
 }
 
+const PERMISOS_VALIDOS = new Set([
+  'despachos.ver', 'despachos.crear',
+  'inventario.ver', 'inventario.editar',
+  'vehiculos.ver', 'vehiculos.editar',
+  'dependencias.ver', 'dependencias.editar',
+  'reportes.ver', 'auditoria.ver',
+])
+
 // Política de contraseñas: mínimo 8 chars, al menos 1 mayúscula, 1 número, 1 símbolo
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/
 
@@ -127,6 +135,8 @@ router.patch('/:id/permisos',
   async (req, res) => {
     const permisos = req.body.permisos
     if (!Array.isArray(permisos)) return res.status(400).json({ error: 'permisos debe ser un array' })
+    const invalidos = permisos.filter(p => typeof p !== 'string' || !PERMISOS_VALIDOS.has(p))
+    if (invalidos.length) return res.status(400).json({ error: `Permisos inválidos: ${invalidos.join(', ')}` })
     const { rows } = await db.query(
       `UPDATE usuarios SET permisos=$1 WHERE id=$2 RETURNING ${SAFE_FIELDS}`,
       [JSON.stringify(permisos), req.params.id]

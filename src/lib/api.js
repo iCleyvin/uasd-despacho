@@ -1,11 +1,12 @@
 const BASE = '/api'
 
-async function request(method, path, body) {
+async function request(method, path, body, signal) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     credentials: 'include', // envía la cookie httpOnly automáticamente
     headers: { 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   })
 
   if (res.status === 204) return null
@@ -15,9 +16,14 @@ async function request(method, path, body) {
   if (!res.ok) {
     const err = new Error(data.error ?? `Error ${res.status}`)
     err.status = res.status
-    if (res.status === 401 && data.error?.includes('invalidada')) {
-      localStorage.setItem('session_kicked', '1')
-      window.dispatchEvent(new CustomEvent('auth:kicked'))
+    if (res.status === 401) {
+      if (data.error?.includes('invalidada')) {
+        localStorage.setItem('session_kicked', '1')
+        window.dispatchEvent(new CustomEvent('auth:kicked'))
+      } else {
+        // JWT expirado u otra razón — redirigir al login
+        window.dispatchEvent(new CustomEvent('auth:expired'))
+      }
     }
     throw err
   }
@@ -26,9 +32,9 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  get:    (path)       => request('GET',    path),
-  post:   (path, body) => request('POST',   path, body),
-  put:    (path, body) => request('PUT',    path, body),
-  patch:  (path, body) => request('PATCH',  path, body),
-  delete: (path)       => request('DELETE', path),
+  get:    (path, { signal } = {})       => request('GET',    path, undefined, signal),
+  post:   (path, body, { signal } = {}) => request('POST',   path, body,      signal),
+  put:    (path, body, { signal } = {}) => request('PUT',    path, body,      signal),
+  patch:  (path, body, { signal } = {}) => request('PATCH',  path, body,      signal),
+  delete: (path, { signal } = {})       => request('DELETE', path, undefined, signal),
 }

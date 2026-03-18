@@ -1,7 +1,7 @@
 require('dotenv').config()
 
 // ─── Validación de variables de entorno requeridas ────────────────────────────
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET']
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'CORS_ORIGIN']
 const missingEnv = REQUIRED_ENV.filter(k => !process.env[k])
 if (missingEnv.length) {
   console.error(`[startup] Variables de entorno faltantes: ${missingEnv.join(', ')}`)
@@ -12,16 +12,27 @@ const express      = require('express')
 const cors         = require('cors')
 const helmet       = require('helmet')
 const cookieParser = require('cookie-parser')
-const rateLimit = require('express-rate-limit')
+const rateLimit    = require('express-rate-limit')
+const morgan       = require('morgan')
+const db           = require('./db')
 
 const app = express()
+
+// ─── Trust proxy (nginx en frente) ────────────────────────────────────────────
+// Necesario para que express-rate-limit lea X-Forwarded-For correctamente.
+app.set('trust proxy', 1)
+
+// ─── Request logging ──────────────────────────────────────────────────────────
+// En producción: formato combinado (IP, método, ruta, status, tiempo)
+// En desarrollo: formato dev (colores, conciso)
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:  ["'self'"],
-      scriptSrc:   ["'none'"],
+      scriptSrc:   ["'self'"],
       styleSrc:    ["'none'"],
       imgSrc:      ["'none'"],
       connectSrc:  ["'self'"],
@@ -81,8 +92,17 @@ app.use('/api/productos',    writeLimiter)
 app.use('/api/dependencias', writeLimiter)
 app.use('/api/usuarios',     writeLimiter)
 
-// ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }))
+// ─── Health check (verifica conectividad con la BD) ───────────────────────────
+const { version } = require('../package.json')
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    await db.query('SELECT 1')
+    res.json({ status: 'ok', version, ts: new Date() })
+  } catch {
+    res.status(503).json({ status: 'error', version, ts: new Date() })
+  }
+})
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth',         require('./routes/auth'))
@@ -104,5 +124,23 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: status >= 500 ? 'Error interno del servidor' : err.message })
 })
 
-const PORT = process.env.PORT ?? 3000
-app.listen(PORT, () => console.log(`API corriendo en puerto ${PORT}`))
+// ─── Exportar app para tests ──────────────────────────────────────────────────
+module.exports = app
+
+// ─── Arrancar servidor solo si se ejecuta directamente ───────────────────────
+if (require.main === module) {
+  const PORT = process.env.PORT ?? 3000
+  const server = app.listen(PORT, () => console.log(`API corriendo en puerto ${PORT}`))
+
+  function shutdown(signal) {
+    console.log(`[${signal}] Cerrando servidor...`)
+    server.close(() => {
+      db.pool.end(() => {
+        console.log('Conexiones cerradas. Saliendo.')
+        process.exit(0)
+      })
+    })
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGINT',  () => shutdown('SIGINT'))
+}
