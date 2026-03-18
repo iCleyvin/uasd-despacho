@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Download, ChevronLeft, ChevronRight, X, Eye, Loader2 } from 'lucide-react'
+import { Search, Download, ChevronLeft, ChevronRight, X, Eye, Loader2, Printer } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
@@ -11,7 +11,7 @@ import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
 import ExportMenu from '../components/ui/ExportMenu'
-import { exportDespachosPDF } from '../lib/exportPdf'
+import { exportDespachosPDF, exportDespachoIndividualPDF } from '../lib/exportPdf'
 
 const PAGE_SIZE = 20
 
@@ -285,7 +285,15 @@ export default function Despachos() {
 }
 
 function DespachoModal({ despacho, onClose }) {
+  const [printing, setPrinting] = useState(false)
   if (!despacho) return null
+
+  async function handlePrint() {
+    setPrinting(true)
+    try { await exportDespachoIndividualPDF(despacho) }
+    finally { setPrinting(false) }
+  }
+
   return (
     <Modal open={!!despacho} onClose={onClose} title={`Despacho #${String(despacho.id).padStart(6, '0')}`} size="md">
       <div className="p-6 space-y-4">
@@ -319,7 +327,15 @@ function DespachoModal({ despacho, onClose }) {
             <div className="col-span-2"><Field label="Observaciones" value={despacho.observaciones} /></div>
           )}
         </div>
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-between pt-2">
+          <Button
+            variant="primary"
+            icon={printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+            onClick={handlePrint}
+            disabled={printing}
+          >
+            {printing ? 'Generando…' : 'Imprimir comprobante'}
+          </Button>
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
         </div>
       </div>

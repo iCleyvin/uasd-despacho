@@ -187,6 +187,128 @@ export async function exportReporteVehiculoPDF(datos, vehiculo, desde, hasta) {
   guardar(doc, `vehiculo_${vehiculo?.placa ?? 'reporte'}_${desde}_${hasta}`)
 }
 
+// ─── Comprobante individual ───────────────────────────────────────────────────
+const CATEGORIA_LABELS_PDF = {
+  combustible:        'Combustible',
+  aceite_motor:       'Aceite de motor',
+  aceite_transmision: 'Aceite de transmisión',
+  repuesto:           'Repuesto',
+  otro:               'Otro',
+}
+
+export async function exportDespachoIndividualPDF(d) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.width   // 210 mm
+  const pageH = doc.internal.pageSize.height  // 297 mm
+
+  // ── Encabezado ───────────────────────────────────────────────────────────
+  const logoData = await loadLogo()
+  if (logoData) {
+    doc.addImage(logoData, 'PNG', pageW - 36, 7, 22, 22)
+  }
+
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.text('UNIVERSIDAD AUTÓNOMA DE SANTO DOMINGO', 14, 16)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(80)
+  doc.text('Departamento de Suministros — Sistema de Despacho', 14, 22)
+  doc.setTextColor(0)
+
+  // Línea divisoria azul
+  doc.setDrawColor(...PRIMARY)
+  doc.setLineWidth(0.8)
+  doc.line(14, 27, pageW - 14, 27)
+
+  // ── Título y número ──────────────────────────────────────────────────────
+  doc.setFontSize(15)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...PRIMARY)
+  doc.text('COMPROBANTE DE DESPACHO', pageW / 2, 36, { align: 'center' })
+  doc.setTextColor(0)
+
+  doc.setFontSize(26)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`#${String(d.id).padStart(6, '0')}`, pageW / 2, 47, { align: 'center' })
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(110)
+  const fechaStr = d.fecha_despacho ? new Date(d.fecha_despacho).toLocaleString('es-DO') : '—'
+  doc.text(fechaStr, pageW / 2, 53, { align: 'center' })
+  doc.setTextColor(0)
+
+  // ── Tabla de detalles ────────────────────────────────────────────────────
+  const details = [
+    ['Vehículo',             `${d.placa}  —  ${d.marca} ${d.modelo}`],
+    ['Dependencia',          d.dependencia_nombre ?? '—'],
+    ['Tipo de vehículo',     d.vehiculo_tipo ?? '—'],
+    ['Producto',             d.producto_nombre ?? '—'],
+    ['Categoría',            CATEGORIA_LABELS_PDF[d.categoria] ?? d.categoria ?? '—'],
+    ['Cantidad despachada',  `${Number(d.cantidad).toFixed(0)} ${d.unidad}`],
+    ['Solicitado por',       d.solicitado_por ?? '—'],
+    ['Despachado por',       d.despachador_nombre ?? '—'],
+    ...(d.cedula_receptor ? [['Cédula del receptor', d.cedula_receptor]]                      : []),
+    ...(d.km_vehiculo     ? [['Km del vehículo',     `${Number(d.km_vehiculo).toFixed(0)} km`]] : []),
+    ...(d.observaciones   ? [['Observaciones',        d.observaciones]]                        : []),
+  ]
+
+  autoTable(doc, {
+    startY: 59,
+    body: details,
+    theme: 'plain',
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 58, fillColor: [241, 245, 249], textColor: 60 },
+      1: { cellWidth: 'auto' },
+    },
+    styles: { fontSize: 10.5, cellPadding: { top: 4, bottom: 4, left: 5, right: 5 } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // ── Áreas de firma ───────────────────────────────────────────────────────
+  const finalY = doc.lastAutoTable.finalY
+  const sigY   = finalY + 28
+  const col    = (pageW - 28) / 2   // ancho de cada columna
+  const lx     = 14                  // x columna izquierda
+  const rx     = 14 + col + 14       // x columna derecha
+
+  doc.setDrawColor(100)
+  doc.setLineWidth(0.5)
+
+  // Línea izquierda
+  doc.line(lx, sigY, lx + col, sigY)
+  // Línea derecha
+  doc.line(rx, sigY, rx + col, sigY)
+
+  // Etiquetas
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Despachador', lx + col / 2, sigY + 6, { align: 'center' })
+  doc.text('Receptor / Solicitante', rx + col / 2, sigY + 6, { align: 'center' })
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(110)
+  doc.text(d.despachador_nombre ?? '', lx + col / 2, sigY + 11, { align: 'center' })
+  doc.text('Firma y sello',           lx + col / 2, sigY + 16, { align: 'center' })
+
+  doc.text(d.solicitado_por ?? '',       rx + col / 2, sigY + 11, { align: 'center' })
+  doc.text('Firma y número de cédula',  rx + col / 2, sigY + 16, { align: 'center' })
+  doc.setTextColor(0)
+
+  // ── Pie de página ────────────────────────────────────────────────────────
+  doc.setFontSize(7)
+  doc.setTextColor(160)
+  doc.text(
+    'Este documento es un comprobante oficial de despacho · UASD — Departamento de Suministros',
+    pageW / 2, pageH - 10, { align: 'center' }
+  )
+
+  doc.save(`despacho_${String(d.id).padStart(6, '0')}.pdf`)
+}
+
 // ─── Despachos ────────────────────────────────────────────────────────────────
 export async function exportDespachosPDF(rows) {
   const doc = await crearDoc(`Historial de Despachos (${rows.length} registros)`, 'landscape')
