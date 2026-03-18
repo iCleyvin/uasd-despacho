@@ -27,7 +27,7 @@ const validarFiltros = [
   query('fecha_desde').optional().isISO8601().withMessage('fecha_desde inválida'),
   query('fecha_hasta').optional().isISO8601().withMessage('fecha_hasta inválida'),
   query('page').optional().isInt({ min: 1 }).withMessage('page inválida'),
-  query('limit').optional().isInt({ min: 1, max: 200 }).withMessage('limit inválido (máx 200)'),
+  query('limit').optional().isInt({ min: 1, max: 1000 }).withMessage('limit inválido (máx 1000)'),
   query('q').optional().trim().isLength({ max: 100 }).withMessage('búsqueda máx 100 caracteres'),
   query('despacho_id').optional().isInt({ min: 1 }).withMessage('despacho_id inválido'),
 ]

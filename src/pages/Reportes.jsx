@@ -53,7 +53,7 @@ function TabDiario() {
   const fetch = useCallback(async (f) => {
     setLoading(true)
     try {
-      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=500`)
+      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=1000`)
       setRows(res.data ?? [])
     } catch { setRows([]) }
     finally { setLoading(false) }
@@ -162,7 +162,7 @@ function TabMensual({ productos }) {
     const fechaHasta = `${y}-${mesStr}-${String(lastDay).padStart(2, '0')}`
     setLoading(true)
     try {
-      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=500`)
+      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=1000`)
       setRows(res.data ?? [])
     } catch { setRows([]) }
     finally { setLoading(false) }
@@ -291,7 +291,7 @@ function TabVehiculo({ vehiculos, dependencias }) {
     if (!vid) { setDatos([]); return }
     setLoading(true)
     try {
-      const res = await api.get(`/despachos?vehiculo_id=${vid}&fecha_desde=${d}&fecha_hasta=${h}&limit=500`)
+      const res = await api.get(`/despachos?vehiculo_id=${vid}&fecha_desde=${d}&fecha_hasta=${h}&limit=1000`)
       const sorted = (res.data ?? []).sort((a, b) => a.fecha_despacho.localeCompare(b.fecha_despacho))
       setDatos(sorted)
     } catch { setDatos([]) }
