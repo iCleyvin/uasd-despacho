@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CheckCircle, Printer, RotateCcw, Search, AlertTriangle, Truck, ClipboardCheck, Plus, X } from 'lucide-react'
+import { CheckCircle, Printer, RotateCcw, Search, AlertTriangle, Truck, ClipboardCheck, Plus, X, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -11,6 +11,7 @@ import Card, { CardHeader, CardBody } from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
 import AccessDenied from '../components/ui/AccessDenied'
 import { api } from '../lib/api'
+import { exportTicketPDF } from '../lib/exportPdf'
 
 const CATEGORIA_BADGE = {
   combustible:        'info',
@@ -234,6 +235,12 @@ export default function NuevoDespacho() {
     const depTicket = dependencias.find(d => d.id === vehiculo?.dependencia_id)
     const first     = items[0]?.despacho
     const last      = items[items.length - 1]?.despacho
+
+    async function handlePrintTicket() {
+      try { await exportTicketPDF({ items, vehiculo, despachador, depTicket }) }
+      catch { /* silent */ }
+    }
+
     return (
       <div className="max-w-lg mx-auto py-8 px-4">
         <Card className="overflow-hidden">
@@ -317,7 +324,7 @@ export default function NuevoDespacho() {
             )}
 
             <div className="flex gap-3 pt-2">
-              <Button variant="secondary" icon={<Printer className="w-4 h-4" />} onClick={() => window.print()} className="flex-1">
+              <Button variant="secondary" icon={<Printer className="w-4 h-4" />} onClick={handlePrintTicket} className="flex-1">
                 Imprimir
               </Button>
               <Button variant="primary" icon={<RotateCcw className="w-4 h-4" />} onClick={resetForm} className="flex-1">
