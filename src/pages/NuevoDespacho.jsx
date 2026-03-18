@@ -450,6 +450,10 @@ export default function NuevoDespacho() {
                   </div>
 
                   {/* Selector de producto */}
+                  {(() => {
+                    const isDup = linea.producto_id &&
+                      lineas.some((l, i) => i !== idx && l.producto_id === linea.producto_id)
+                    return (
                   <Select
                     label="Producto"
                     value={linea.producto_id}
@@ -458,7 +462,7 @@ export default function NuevoDespacho() {
                       updateLinea(idx, 'cantidad', '')
                       setErrors(ev => ({ ...ev, [`producto_${idx}`]: undefined, [`cantidad_${idx}`]: undefined }))
                     }}
-                    error={errors[`producto_${idx}`]}
+                    error={errors[`producto_${idx}`] ?? (isDup ? 'Este producto ya está en otra línea' : undefined)}
                   >
                     <option value="">Seleccionar producto…</option>
                     {Object.entries(categorias).map(([cat, prods]) => (
@@ -471,6 +475,8 @@ export default function NuevoDespacho() {
                       </optgroup>
                     ))}
                   </Select>
+                    )
+                  })()}
 
                   {/* Info de stock */}
                   {prod && (
