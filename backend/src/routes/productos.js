@@ -65,31 +65,41 @@ router.patch('/:id/toggle', requireAuth, requirePermiso('inventario.editar'), as
   }
 })
 
-// Registrar entrada de inventario
+// Registrar entrada de inventario — UPDATE atómico para evitar race conditions
 router.post('/:id/entrada', requireAuth, requirePermiso('inventario.editar'), validarEntrada, validar, async (req, res) => {
+  const client = await db.pool.connect()
   try {
     const { cantidad, notas } = req.body
+    await client.query('BEGIN')
 
-    const { rows: cur } = await db.query('SELECT * FROM productos WHERE id=$1', [req.params.id])
-    if (!cur[0]) return res.status(404).json({ error: 'No encontrado' })
+    // SELECT FOR UPDATE + UPDATE en una sola transacción: ninguna otra entrada
+    // puede leer el mismo row hasta que hagamos COMMIT
+    const { rows: locked } = await client.query(
+      'SELECT id, stock_actual FROM productos WHERE id=$1 FOR UPDATE', [req.params.id]
+    )
+    if (!locked[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'No encontrado' }) }
 
-    const stockAntes = Number(cur[0].stock_actual)
+    const stockAntes = Number(locked[0].stock_actual)
     const stockNuevo = stockAntes + Number(cantidad)
 
-    const { rows } = await db.query(
+    const { rows } = await client.query(
       'UPDATE productos SET stock_actual=$1 WHERE id=$2 RETURNING *', [stockNuevo, req.params.id]
     )
+    await client.query('COMMIT')
 
     await addAudit({
-      accion: 'ENTRADA', tabla: 'productos', registro_id: cur[0].id, usuario_id: req.user.id,
+      accion: 'ENTRADA', tabla: 'productos', registro_id: locked[0].id, usuario_id: req.user.id,
       datos_antes: { stock_actual: stockAntes },
       datos_nuevo: { stock_actual: stockNuevo, cantidad_entrada: Number(cantidad), notas: notas ?? '' },
     })
 
     res.json(rows[0])
   } catch (err) {
+    await client.query('ROLLBACK')
     console.error('[productos POST /:id/entrada]', err.message)
     res.status(500).json({ error: 'Error al registrar entrada' })
+  } finally {
+    client.release()
   }
 })
 

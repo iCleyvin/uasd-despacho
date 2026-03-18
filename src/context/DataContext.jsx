@@ -35,6 +35,15 @@ export function DataProvider({ children }) {
     }
   }, [isAuthenticated])
 
+  // Recarga solo productos (ligero, para stock siempre fresco)
+  const reloadProductos = useCallback(async () => {
+    if (!isAuthenticated) return
+    try {
+      const res = await api.get('/productos')
+      setProductos(res.data)
+    } catch { /* silent */ }
+  }, [isAuthenticated])
+
   useEffect(() => { reload() }, [reload])
 
   // ── Despachos ────────────────────────────────────────────────────────────
@@ -48,12 +57,16 @@ export function DataProvider({ children }) {
   async function crearDespacho(data) {
     const nuevo = await api.post('/despachos', data)
     setDespachos(prev => [nuevo, ...prev])
-    // Actualizar stock del producto en local
+    // Actualización optimista inmediata para UI responsiva
     setProductos(prev => prev.map(p =>
       p.id === data.producto_id
         ? { ...p, stock_actual: Number(p.stock_actual) - Number(data.cantidad) }
         : p
     ))
+    // Refrescar stock real del servidor en segundo plano —
+    // garantiza que todos los usuarios vean el stock correcto
+    // aunque haya otros despachos concurrentes en curso
+    api.get('/productos').then(res => setProductos(res.data)).catch(() => {})
     return nuevo
   }
 
@@ -149,7 +162,7 @@ export function DataProvider({ children }) {
       // state
       despachos, productos, vehiculos, dependencias, usuarios, auditoria, loading,
       // loaders
-      reload, loadDespachos, loadUsuarios, loadAuditoria,
+      reload, reloadProductos, loadDespachos, loadUsuarios, loadAuditoria,
       // despachos
       crearDespacho,
       // inventario

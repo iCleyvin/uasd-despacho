@@ -54,7 +54,10 @@ const EMPTY_FORM = {
 
 export default function NuevoDespacho() {
   const { user, hasPermiso } = useAuth()
-  const { vehiculos, productos, dependencias, crearDespacho } = useData()
+  const { vehiculos, productos, dependencias, crearDespacho, reloadProductos } = useData()
+
+  // Refrescar stock al abrir el formulario para mostrar valores reales
+  useEffect(() => { reloadProductos() }, []) // eslint-disable-line
 
   const [form, setForm]                         = useState(EMPTY_FORM)
   const [lineas, setLineas]                     = useState([newLinea()])
