@@ -49,13 +49,15 @@ function TabDiario() {
   const [fecha,   setFecha]   = useState(today)
   const [rows,    setRows]    = useState([])
   const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
 
   const fetch = useCallback(async (f) => {
     setLoading(true)
+    setError('')
     try {
-      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=1000`)
-      setRows(res.data ?? [])
-    } catch { setRows([]) }
+      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=200`)
+      setRows(Array.isArray(res.data) ? res.data : [])
+    } catch (err) { setError(err.message); setRows([]) }
     finally { setLoading(false) }
   }, [])
 
@@ -102,6 +104,8 @@ function TabDiario() {
 
       {loading ? (
         <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      ) : error ? (
+        <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
       ) : datos.length === 0 ? (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para esta fecha.</p></CardBody></Card>
       ) : (
@@ -154,6 +158,7 @@ function TabMensual({ productos }) {
   const [año, setAño] = useState(now.getFullYear())
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const fetchMensual = useCallback(async (m, y) => {
     const mesStr = String(m).padStart(2, '0')
@@ -161,10 +166,11 @@ function TabMensual({ productos }) {
     const fechaDesde = `${y}-${mesStr}-01`
     const fechaHasta = `${y}-${mesStr}-${String(lastDay).padStart(2, '0')}`
     setLoading(true)
+    setError('')
     try {
-      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=1000`)
-      setRows(res.data ?? [])
-    } catch { setRows([]) }
+      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=200`)
+      setRows(Array.isArray(res.data) ? res.data : [])
+    } catch (err) { setError(err.message); setRows([]) }
     finally { setLoading(false) }
   }, [])
 
@@ -228,6 +234,8 @@ function TabMensual({ productos }) {
 
       {loading ? (
         <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      ) : error ? (
+        <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
       ) : datos.length === 0 ? (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este mes.</p></CardBody></Card>
       ) : (
@@ -286,15 +294,17 @@ function TabVehiculo({ vehiculos, dependencias }) {
   const [hasta, setHasta] = useState(today)
   const [datos, setDatos] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const fetchVehiculo = useCallback(async (vid, d, h) => {
     if (!vid) { setDatos([]); return }
     setLoading(true)
+    setError('')
     try {
-      const res = await api.get(`/despachos?vehiculo_id=${vid}&fecha_desde=${d}&fecha_hasta=${h}&limit=1000`)
-      const sorted = (res.data ?? []).sort((a, b) => a.fecha_despacho.localeCompare(b.fecha_despacho))
-      setDatos(sorted)
-    } catch { setDatos([]) }
+      const res = await api.get(`/despachos?vehiculo_id=${vid}&fecha_desde=${d}&fecha_hasta=${h}&limit=200`)
+      const arr = Array.isArray(res.data) ? res.data : []
+      setDatos(arr.sort((a, b) => a.fecha_despacho.localeCompare(b.fecha_despacho)))
+    } catch (err) { setError(err.message); setDatos([]) }
     finally { setLoading(false) }
   }, [])
 
@@ -363,11 +373,14 @@ function TabVehiculo({ vehiculos, dependencias }) {
         <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
       )}
 
-      {vehiculoId && !loading && datos.length === 0 && (
+      {vehiculoId && !loading && error && (
+        <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
+      )}
+      {vehiculoId && !loading && !error && datos.length === 0 && (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este vehículo en el período seleccionado.</p></CardBody></Card>
       )}
 
-      {vehiculoId && !loading && datos.length > 0 && (
+      {vehiculoId && !loading && !error && datos.length > 0 && (
         <>
           {/* Info vehículo */}
           {v && (
