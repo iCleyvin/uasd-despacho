@@ -74,12 +74,19 @@ CREATE TABLE IF NOT EXISTS auditoria (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_despachos_vehiculo  ON despachos(vehiculo_id);
-CREATE INDEX IF NOT EXISTS idx_despachos_producto  ON despachos(producto_id);
-CREATE INDEX IF NOT EXISTS idx_despachos_fecha     ON despachos(fecha_despacho DESC);
-CREATE INDEX IF NOT EXISTS idx_auditoria_tabla     ON auditoria(tabla);
-CREATE INDEX IF NOT EXISTS idx_auditoria_fecha     ON auditoria(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_vehiculos_placa     ON vehiculos(placa);
+CREATE INDEX IF NOT EXISTS idx_despachos_vehiculo      ON despachos(vehiculo_id);
+CREATE INDEX IF NOT EXISTS idx_despachos_producto      ON despachos(producto_id);
+CREATE INDEX IF NOT EXISTS idx_despachos_fecha         ON despachos(fecha_despacho DESC);
+CREATE INDEX IF NOT EXISTS idx_despachos_despachado    ON despachos(despachado_por);
+CREATE INDEX IF NOT EXISTS idx_auditoria_tabla         ON auditoria(tabla);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha         ON auditoria(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_usuario       ON auditoria(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_registro      ON auditoria(registro_id);
+CREATE INDEX IF NOT EXISTS idx_vehiculos_placa         ON vehiculos(placa);
+CREATE INDEX IF NOT EXISTS idx_vehiculos_dependencia   ON vehiculos(dependencia_id);
+CREATE INDEX IF NOT EXISTS idx_usuarios_email          ON usuarios(email);
+CREATE INDEX IF NOT EXISTS idx_usuarios_activos        ON usuarios(activo) WHERE activo = true;
+CREATE INDEX IF NOT EXISTS idx_productos_categoria     ON productos(categoria);
 `
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
@@ -354,6 +361,35 @@ async function run() {
   await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS ficha_vieja VARCHAR(20)  DEFAULT NULL`)
   await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS matricula   VARCHAR(30)  DEFAULT NULL`)
   await db.query(`ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS chasis      VARCHAR(100) DEFAULT NULL`)
+
+  // Columnas para reset de contraseña (token con expiración)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS reset_token_hash    VARCHAR(128) DEFAULT NULL`)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ  DEFAULT NULL`)
+
+  // Columna para gestión de sesiones (incrementar para invalidar todos los tokens emitidos)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 1`)
+
+  // Columna de permisos granulares por usuario
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos JSONB DEFAULT '[]'`)
+
+  // Poblar permisos por defecto según rol actual (solo para usuarios sin permisos asignados)
+  await db.query(`
+    UPDATE usuarios SET permisos = '["despachos.ver","despachos.crear","inventario.ver","inventario.editar","vehiculos.ver","vehiculos.editar","dependencias.ver","dependencias.editar","reportes.ver","auditoria.ver"]'::jsonb
+    WHERE rol = 'supervisor' AND (permisos IS NULL OR permisos = '[]'::jsonb)
+  `)
+  await db.query(`
+    UPDATE usuarios SET permisos = '["despachos.ver","despachos.crear","inventario.ver","vehiculos.ver","dependencias.ver","reportes.ver"]'::jsonb
+    WHERE rol = 'despachador' AND (permisos IS NULL OR permisos = '[]'::jsonb)
+  `)
+
+  // Restricción: el stock no puede ser negativo
+  await db.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_stock_no_negativo') THEN
+        ALTER TABLE productos ADD CONSTRAINT chk_stock_no_negativo CHECK (stock_actual >= 0);
+      END IF;
+    END $$
+  `)
 
   // Normalizar tipo y combustible a Title Case (idempotente)
   console.log('▶ Normalizando tipo y combustible a Title Case...')

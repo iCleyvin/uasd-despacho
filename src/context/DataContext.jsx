@@ -25,9 +25,9 @@ export function DataProvider({ children }) {
         api.get('/productos'),
         api.get('/vehiculos'),
       ])
-      setDependencias(deps)
-      setProductos(prods)
-      setVehiculos(vehs)
+      setDependencias(deps.data)
+      setProductos(prods.data)
+      setVehiculos(vehs.data)
     } catch (err) {
       console.error('Error cargando datos:', err)
     } finally {
@@ -61,6 +61,23 @@ export function DataProvider({ children }) {
   async function registrarEntrada(productoId, cantidad, notas = '') {
     const updated = await api.post(`/productos/${productoId}/entrada`, { cantidad, notas })
     setProductos(prev => prev.map(p => p.id === updated.id ? updated : p))
+  }
+
+  async function editarProducto(id, data) {
+    const updated = await api.put(`/productos/${id}`, data)
+    setProductos(prev => prev.map(p => p.id === id ? updated : p))
+    return updated
+  }
+
+  async function crearProducto(data) {
+    const nuevo = await api.post('/productos', data)
+    setProductos(prev => [...prev, nuevo])
+    return nuevo
+  }
+
+  async function toggleProductoActivo(id) {
+    const updated = await api.patch(`/productos/${id}/toggle`)
+    setProductos(prev => prev.map(p => p.id === id ? updated : p))
   }
 
   // ── Vehículos ────────────────────────────────────────────────────────────
@@ -99,8 +116,8 @@ export function DataProvider({ children }) {
 
   // ── Usuarios ─────────────────────────────────────────────────────────────
   async function loadUsuarios() {
-    const rows = await api.get('/usuarios')
-    setUsuarios(rows)
+    const res = await api.get('/usuarios')
+    setUsuarios(res.data)
   }
 
   async function crearUsuario(data) {
@@ -136,7 +153,7 @@ export function DataProvider({ children }) {
       // despachos
       crearDespacho,
       // inventario
-      registrarEntrada,
+      registrarEntrada, crearProducto, editarProducto, toggleProductoActivo,
       // vehículos
       crearVehiculo, editarVehiculo, toggleVehiculoActivo,
       // dependencias

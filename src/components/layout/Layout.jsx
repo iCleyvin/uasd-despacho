@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import StockAlertBanner from './StockAlertBanner'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import { useAuth } from '../../context/AuthContext'
@@ -32,6 +33,7 @@ export default function Layout() {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setSidebarOpen(true)} />
+        <StockAlertBanner />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>

@@ -1,22 +1,31 @@
 import { useState } from 'react'
 import { Plus, Edit2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
 import Input from '../components/ui/Input'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
+import AccessDenied from '../components/ui/AccessDenied'
+import ExportMenu from '../components/ui/ExportMenu'
+import { exportDependenciasPDF } from '../lib/exportPdf'
+import { exportDependenciasCSV } from '../lib/exportCsv'
 
 const EMPTY_FORM = { nombre: '', codigo: '' }
 
 export default function Dependencias() {
   const { dependencias, vehiculos, crearDependencia, editarDependencia, toggleDependenciaActivo } = useData()
+  const { hasPermiso } = useAuth()
+  const canEdit = hasPermiso('dependencias.editar')
 
   const [formModal,  setFormModal]  = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [form,       setForm]       = useState(EMPTY_FORM)
   const [errors,     setErrors]     = useState({})
   const [saving,     setSaving]     = useState(false)
+
+  if (!hasPermiso('dependencias.ver')) return <AccessDenied />
 
   function vehiculosCount(depId) {
     return vehiculos.filter(v => v.dependencia_id === depId).length
@@ -54,15 +63,19 @@ export default function Dependencias() {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setSaving(true)
-    await new Promise(r => setTimeout(r, 300))
-    const payload = { nombre: form.nombre.trim(), codigo: form.codigo.trim().toUpperCase() }
-    if (editTarget) {
-      editarDependencia(editTarget.id, payload)
-    } else {
-      crearDependencia(payload)
+    try {
+      const payload = { nombre: form.nombre.trim(), codigo: form.codigo.trim().toUpperCase() }
+      if (editTarget) {
+        await editarDependencia(editTarget.id, payload)
+      } else {
+        await crearDependencia(payload)
+      }
+      setFormModal(false)
+    } catch (err) {
+      setErrors({ codigo: err?.response?.data?.error ?? 'Error al guardar' })
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setFormModal(false)
   }
 
   function handleToggle(d) {
@@ -80,9 +93,14 @@ export default function Dependencias() {
             {dependencias.length} dependencias registradas
           </p>
         </div>
-        <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
-          Nueva Dependencia
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu onPDF={() => exportDependenciasPDF(dependencias)} onCSV={() => exportDependenciasCSV(dependencias)} />
+          {canEdit && (
+            <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+              Nueva Dependencia
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -115,25 +133,27 @@ export default function Dependencias() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => openEdit(d)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-primary-600 transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleToggle(d)}
-                        className={`p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${d.activo ? 'text-green-500 hover:text-red-500' : 'text-slate-400 hover:text-green-500'}`}
-                        title={d.activo ? 'Desactivar' : 'Activar'}
-                      >
-                        {d.activo
-                          ? <ToggleRight className="w-5 h-5" />
-                          : <ToggleLeft className="w-5 h-5" />
-                        }
-                      </button>
-                    </div>
+                    {canEdit && (
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => openEdit(d)}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-primary-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggle(d)}
+                          className={`p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${d.activo ? 'text-green-500 hover:text-red-500' : 'text-slate-400 hover:text-green-500'}`}
+                          title={d.activo ? 'Desactivar' : 'Activar'}
+                        >
+                          {d.activo
+                            ? <ToggleRight className="w-5 h-5" />
+                            : <ToggleLeft className="w-5 h-5" />
+                          }
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

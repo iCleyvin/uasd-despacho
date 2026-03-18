@@ -8,6 +8,8 @@ import { useData } from '../context/DataContext'
 import { api } from '../lib/api'
 import { formatDateTime, formatNumber } from '../utils/format'
 
+const TODAY = new Date().toISOString().slice(0, 10)
+
 const CHART_COLORS = ['#1a3c8f', '#c8a951', '#10b981', '#f59e0b', '#6366f1']
 
 function KpiCard({ icon: Icon, label, value, sub, color, alert }) {
@@ -83,33 +85,42 @@ function DetalleDespacho({ despacho }) {
   )
 }
 
-const TODAY = new Date().toISOString().slice(0, 10)
-
 export default function Dashboard() {
-  const { despachos, productos, vehiculos, loadDespachos } = useData()
+  const { productos } = useData()
 
-  const [consumoChart, setConsumoChart]       = useState([])
-  const [chartProductos, setChartProductos]   = useState([])
+  const [despachos,      setDespachos]      = useState([])
+  const [consumoChart,   setConsumoChart]   = useState([])
+  const [chartProductos, setChartProductos] = useState([])
   const [despachoDetalle, setDespachoDetalle] = useState(null)
 
-  useEffect(() => { loadDespachos({ limit: 50 }) }, []) // eslint-disable-line
-
+  // Una sola llamada consolida despachos recientes + consumo diario
   useEffect(() => {
-    api.get('/reportes/consumo-diario?dias=7')
-      .then(rows => {
-        const combustibles = rows.filter(r => r.categoria === 'combustible')
-        const names = [...new Set(combustibles.map(r => r.producto))]
-        setChartProductos(names)
+    api.get('/reportes/dashboard')
+      .then(({ despachos_recientes, consumo_diario }) => {
+        setDespachos(despachos_recientes)
+
+        const combustibles = consumo_diario.filter(r => r.categoria === 'combustible')
+        setChartProductos([...new Set(combustibles.map(r => r.producto))])
+
+        const days = []
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date()
+          d.setDate(d.getDate() - i)
+          const mm = String(d.getMonth() + 1).padStart(2, '0')
+          const dd = String(d.getDate()).padStart(2, '0')
+          days.push(`${mm}/${dd}`)
+        }
         const byDate = {}
+        days.forEach(f => { byDate[f] = { fecha: f } })
         combustibles.forEach(r => {
-          const fecha = r.fecha.slice(5).replace('-', '/')
+          const fecha = String(r.fecha).slice(5, 10).replace('-', '/')
           if (!byDate[fecha]) byDate[fecha] = { fecha }
           byDate[fecha][r.producto] = Number(r.total)
         })
-        setConsumoChart(Object.values(byDate))
+        setConsumoChart(days.map(d => byDate[d]))
       })
       .catch(() => {})
-  }, [])
+  }, []) // eslint-disable-line
 
   const handleRowClick = useCallback(async (id) => {
     setDespachoDetalle({ id, _loading: true })
@@ -121,15 +132,11 @@ export default function Dashboard() {
     }
   }, [])
 
-  const todayDespachos = despachos.filter(d => d.fecha_despacho?.startsWith(TODAY))
-  const todayCombustible = todayDespachos
-    .filter(d => d.categoria === 'combustible' || [1, 2].includes(d.producto_id))
-    .reduce((s, d) => s + Number(d.cantidad), 0)
-  const todayAceite = todayDespachos
-    .filter(d => d.categoria === 'aceite_motor' || [3, 4].includes(d.producto_id))
-    .reduce((s, d) => s + Number(d.cantidad), 0)
-  const lowStock = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
-  const recentDespachos = despachos.slice(0, 10)
+  const todayDespachos   = despachos.filter(d => d.fecha_despacho?.startsWith(TODAY))
+  const todayCombustible = todayDespachos.filter(d => d.categoria === 'combustible').reduce((s, d) => s + Number(d.cantidad), 0)
+  const todayAceite      = todayDespachos.filter(d => d.categoria === 'aceite_motor').reduce((s, d) => s + Number(d.cantidad), 0)
+  const lowStock         = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
+  const recentDespachos  = despachos
 
   return (
     <div className="space-y-6">
@@ -224,23 +231,20 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentDespachos.map((d, i) => {
-                const veh = vehiculos.find(v => v.id === d.vehiculo_id)
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => handleRowClick(d.id)}
-                    className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}
-                  >
-                    <td className="px-6 py-3 font-mono text-xs font-semibold text-primary-600">#{String(d.id).padStart(6, '0')}</td>
-                    <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(d.fecha_despacho)}</td>
-                    <td className="px-6 py-3 font-plate font-semibold text-slate-900 dark:text-slate-100">{d.placa ?? veh?.placa}</td>
-                    <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{d.producto_nombre}</td>
-                    <td className="px-6 py-3 font-semibold text-slate-900 dark:text-slate-100">{d.cantidad} {d.unidad}</td>
-                    <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{d.solicitado_por}</td>
-                  </tr>
-                )
-              })}
+              {recentDespachos.map((d, i) => (
+                <tr
+                  key={d.id}
+                  onClick={() => handleRowClick(d.id)}
+                  className={`border-b border-slate-50 dark:border-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-slate-800/50'}`}
+                >
+                  <td className="px-6 py-3 font-mono text-xs font-semibold text-primary-600">#{String(d.id).padStart(6, '0')}</td>
+                  <td className="px-6 py-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDateTime(d.fecha_despacho)}</td>
+                  <td className="px-6 py-3 font-plate font-semibold text-slate-900 dark:text-slate-100">{d.placa}</td>
+                  <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{d.producto_nombre}</td>
+                  <td className="px-6 py-3 font-semibold text-slate-900 dark:text-slate-100">{d.cantidad} {d.unidad}</td>
+                  <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{d.solicitado_por}</td>
+                </tr>
+              ))}
               {recentDespachos.length === 0 && (
                 <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400">Sin despachos registrados</td></tr>
               )}

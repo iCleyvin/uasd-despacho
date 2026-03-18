@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { LogOut, Moon, Sun, KeyRound, ChevronDown } from 'lucide-react'
+import { LogOut, Moon, Sun, KeyRound, ChevronDown, ShieldOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { api } from '../../lib/api'
 import { ROL_LABELS } from '../../utils/format'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -30,10 +31,15 @@ function ChangePasswordModal({ open, onClose }) {
     const e2 = validate()
     if (Object.keys(e2).length) { setErrors(e2); return }
     setLoading(true)
-    await new Promise(r => setTimeout(r, 800)) // TODO: API call
-    setLoading(false)
-    setSuccess(true)
-    setTimeout(() => { setSuccess(false); onClose() }, 1200)
+    try {
+      await api.post('/auth/change-password', { actual: form.actual, nueva: form.nueva })
+      setSuccess(true)
+      setTimeout(() => { setSuccess(false); onClose(); setForm({ actual: '', nueva: '', confirmar: '' }) }, 1500)
+    } catch (err) {
+      setErrors({ actual: err.message })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -58,7 +64,8 @@ export default function UserMenu() {
   const { theme, toggleTheme } = useTheme()
   const navigate               = useNavigate()
   const [open, setOpen]        = useState(false)
-  const [showPwModal, setShowPwModal] = useState(false)
+  const [showPwModal,  setShowPwModal]  = useState(false)
+  const [logoutAllBusy, setLogoutAllBusy] = useState(false)
   const ref = useRef(null)
 
   const initials = [user?.nombre?.[0], user?.apellido?.[0]].filter(Boolean).join('').toUpperCase()
@@ -70,6 +77,15 @@ export default function UserMenu() {
   }, [])
 
   function handleLogout() {
+    logout()
+    navigate('/login')
+  }
+
+  async function handleLogoutAll() {
+    setLogoutAllBusy(true)
+    try {
+      await api.post('/auth/logout-all')
+    } catch { /* silent */ }
     logout()
     navigate('/login')
   }
@@ -125,6 +141,16 @@ export default function UserMenu() {
             >
               <KeyRound className="w-4 h-4 text-slate-400" />
               Cambiar contraseña
+            </button>
+
+            {/* Invalidar todas las sesiones */}
+            <button
+              onClick={() => { setOpen(false); handleLogoutAll() }}
+              disabled={logoutAllBusy}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+            >
+              <ShieldOff className="w-4 h-4 text-slate-400" />
+              Cerrar todas las sesiones
             </button>
 
             <div className="my-1 border-t border-slate-100 dark:border-slate-700" />

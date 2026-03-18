@@ -47,11 +47,19 @@ export function AuthProvider({ children }) {
     return user && roles.includes(user.rol)
   }, [user])
 
+  // admin siempre tiene acceso total; otros usuarios dependen de su lista de permisos
+  const hasPermiso = useCallback((permiso) => {
+    if (!user) return false
+    if (user.rol === 'admin') return true
+    if (!permiso) return true
+    return (user.permisos ?? []).includes(permiso)
+  }, [user])
+
   // Mientras se verifica la sesión inicial, no renderizar children para evitar flash
   if (!verified) return null
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, hasRole, hasPermiso }}>
       {children}
     </AuthContext.Provider>
   )

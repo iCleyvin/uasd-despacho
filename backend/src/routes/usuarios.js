@@ -5,8 +5,25 @@ const { body, param, validationResult } = require('express-validator')
 const { requireAuth, requireRole } = require('../middleware/auth')
 const { addAudit } = require('../middleware/audit')
 
-const SAFE_FIELDS = 'id, nombre, apellido, email, rol, activo, created_at'
+const SAFE_FIELDS = 'id, nombre, apellido, email, rol, activo, created_at, permisos'
 const ROLES_VALIDOS = ['admin', 'supervisor', 'despachador']
+
+const PERMISOS_POR_ROL = {
+  supervisor: [
+    'despachos.ver', 'despachos.crear',
+    'inventario.ver', 'inventario.editar',
+    'vehiculos.ver', 'vehiculos.editar',
+    'dependencias.ver', 'dependencias.editar',
+    'reportes.ver', 'auditoria.ver',
+  ],
+  despachador: [
+    'despachos.ver', 'despachos.crear',
+    'inventario.ver',
+    'vehiculos.ver',
+    'dependencias.ver',
+    'reportes.ver',
+  ],
+}
 
 // Política de contraseñas: mínimo 8 chars, al menos 1 mayúscula, 1 número, 1 símbolo
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/
@@ -34,19 +51,25 @@ function validar(req, res, next) {
 }
 
 router.get('/', requireAuth, requireRole('admin'), async (_req, res) => {
-  const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios ORDER BY created_at`)
-  res.json(rows)
+  try {
+    const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios ORDER BY created_at`)
+    res.json({ data: rows, total: rows.length })
+  } catch (err) {
+    console.error('[usuarios GET /]', err.message)
+    res.status(500).json({ error: 'Error al obtener usuarios' })
+  }
 })
 
 router.post('/', requireAuth, requireRole('admin'), [...validarUsuario, validarPasswordNuevo], validar, async (req, res) => {
   const { nombre, apellido, email, password, rol } = req.body
 
   const hash = await bcrypt.hash(password, 12)
+  const permisosDefault = JSON.stringify(PERMISOS_POR_ROL[rol] ?? [])
   try {
     const { rows } = await db.query(`
-      INSERT INTO usuarios (nombre, apellido, email, password_hash, rol)
-      VALUES ($1,$2,$3,$4,$5) RETURNING ${SAFE_FIELDS}
-    `, [nombre.trim(), apellido.trim(), email, hash, rol])
+      INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, permisos)
+      VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${SAFE_FIELDS}
+    `, [nombre.trim(), apellido.trim(), email, hash, rol, permisosDefault])
     await addAudit({
       accion: 'CREATE', tabla: 'usuarios', registro_id: rows[0].id, usuario_id: req.user.id,
       datos_nuevo: { nombre, apellido, email, rol, password: '[REDACTED]' },
@@ -78,6 +101,22 @@ router.put('/:id',
       accion: 'UPDATE', tabla: 'usuarios', registro_id: rows[0].id, usuario_id: req.user.id,
       datos_nuevo: { nombre, apellido, email, rol, password: password ? '[REDACTED]' : undefined },
     })
+    res.json(rows[0])
+  }
+)
+
+router.patch('/:id/permisos',
+  requireAuth, requireRole('admin'),
+  [param('id').isInt()], validar,
+  async (req, res) => {
+    const permisos = req.body.permisos
+    if (!Array.isArray(permisos)) return res.status(400).json({ error: 'permisos debe ser un array' })
+    const { rows } = await db.query(
+      `UPDATE usuarios SET permisos=$1 WHERE id=$2 RETURNING ${SAFE_FIELDS}`,
+      [JSON.stringify(permisos), req.params.id]
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'No encontrado' })
+    await addAudit({ accion: 'UPDATE', tabla: 'usuarios', registro_id: rows[0].id, usuario_id: req.user.id, datos_nuevo: { permisos } })
     res.json(rows[0])
   }
 )

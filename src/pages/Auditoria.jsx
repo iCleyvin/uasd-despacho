@@ -1,14 +1,16 @@
-import { useState, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Eye, ShieldOff } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Eye, ShieldOff, Download, Loader2, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { api } from '../lib/api'
 import { formatDateTime } from '../utils/format'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardBody } from '../components/ui/Card'
+import AccessDenied from '../components/ui/AccessDenied'
 
 const PAGE_SIZE = 20
 
@@ -28,21 +30,79 @@ const TABLA_LABELS = {
 }
 
 export default function Auditoria() {
-  const { user, hasRole } = useAuth()
-  const { auditoria, usuarios, loadAuditoria, loadUsuarios } = useData()
+  const { hasRole, hasPermiso } = useAuth()
+  const { usuarios, loadUsuarios } = useData()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    loadAuditoria()
-    loadUsuarios()
-  }, []) // eslint-disable-line
+  const [rows,      setRows]      = useState([])
+  const [total,     setTotal]     = useState(0)
+  const [loading,   setLoading]   = useState(false)
+  const [page,      setPage]      = useState(1)
+  const [selected,  setSelected]  = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   const [filterUsuario, setFilterUsuario] = useState('')
   const [filterDesde,   setFilterDesde]   = useState('')
   const [filterHasta,   setFilterHasta]   = useState('')
   const [filterAccion,  setFilterAccion]  = useState('')
-  const [page,          setPage]          = useState(1)
-  const [selected,      setSelected]      = useState(null)
+  const [filterTabla,   setFilterTabla]   = useState('')
+
+  useEffect(() => { loadUsuarios() }, []) // eslint-disable-line
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const buildParams = useCallback((p = page) => {
+    const params = { page: p, limit: PAGE_SIZE }
+    if (filterUsuario) params.usuario_id  = filterUsuario
+    if (filterDesde)   params.fecha_desde = filterDesde
+    if (filterHasta)   params.fecha_hasta = filterHasta
+    if (filterAccion)  params.accion      = filterAccion
+    if (filterTabla)   params.tabla       = filterTabla
+    return params
+  }, [page, filterUsuario, filterDesde, filterHasta, filterAccion, filterTabla])
+
+  const fetchData = useCallback(async (p = 1) => {
+    setLoading(true)
+    try {
+      const res = await api.get('/auditoria?' + new URLSearchParams(buildParams(p)))
+      setRows(res.data)
+      setTotal(res.total)
+      setPage(p)
+    } catch { /* error manejado por api.js */ }
+    finally { setLoading(false) }
+  }, [buildParams])
+
+  useEffect(() => { fetchData(1) }, [filterUsuario, filterDesde, filterHasta, filterAccion, filterTabla]) // eslint-disable-line
+
+  if (!hasPermiso('auditoria.ver')) return <AccessDenied />
+
+  const hasFilters = filterUsuario || filterDesde || filterHasta || filterAccion || filterTabla
+
+  function clearFilters() {
+    setFilterUsuario('')
+    setFilterDesde('')
+    setFilterHasta('')
+    setFilterAccion('')
+    setFilterTabla('')
+  }
+
+  async function exportCSV() {
+    setExporting(true)
+    try {
+      const qs = new URLSearchParams(buildParams(1))
+      qs.delete('page'); qs.delete('limit')
+      const response = await fetch(`/api/auditoria/export?${qs}`, { credentials: 'include' })
+      if (!response.ok) throw new Error('Error al exportar')
+      const blob = await response.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `auditoria_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { /* silent */ }
+    finally { setExporting(false) }
+  }
 
   // Redirect non-admin/supervisor
   if (!hasRole('admin', 'supervisor')) {
@@ -56,36 +116,29 @@ export default function Auditoria() {
     )
   }
 
-  const filtered = useMemo(() => {
-    return auditoria.filter(a => {
-      if (filterUsuario && a.usuario_id !== Number(filterUsuario)) return false
-      if (filterDesde   && a.created_at < filterDesde) return false
-      if (filterHasta   && a.created_at > filterHasta + 'T23:59:59') return false
-      if (filterAccion  && !a.accion.toLowerCase().includes(filterAccion.toLowerCase())) return false
-      return true
-    }).sort((a, b) => b.created_at.localeCompare(a.created_at))
-  }, [auditoria, filterUsuario, filterDesde, filterHasta, filterAccion])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
   return (
     <div className="py-6 px-4 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-slate-100">Registro de Auditoría</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Historial de todas las acciones realizadas en el sistema
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-slate-100">Registro de Auditoría</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            {loading ? 'Cargando…' : `${total.toLocaleString()} registro${total !== 1 ? 's' : ''} encontrados`}
+          </p>
+        </div>
+        <Button variant="secondary" icon={exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          onClick={exportCSV} disabled={exporting || total === 0}>
+          {exporting ? 'Exportando…' : 'Exportar CSV'}
+        </Button>
       </div>
 
       {/* Filtros */}
       <Card className="mb-4">
         <CardBody className="py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Select
               label="Usuario"
               value={filterUsuario}
-              onChange={e => { setFilterUsuario(e.target.value); setPage(1) }}
+              onChange={e => setFilterUsuario(e.target.value)}
             >
               <option value="">Todos los usuarios</option>
               {usuarios.map(u => (
@@ -96,21 +149,44 @@ export default function Auditoria() {
               label="Desde"
               type="date"
               value={filterDesde}
-              onChange={e => { setFilterDesde(e.target.value); setPage(1) }}
+              onChange={e => setFilterDesde(e.target.value)}
             />
             <Input
               label="Hasta"
               type="date"
               value={filterHasta}
-              onChange={e => { setFilterHasta(e.target.value); setPage(1) }}
+              onChange={e => setFilterHasta(e.target.value)}
             />
-            <Input
+            <Select
               label="Acción"
-              placeholder="CREATE, UPDATE…"
               value={filterAccion}
-              onChange={e => { setFilterAccion(e.target.value); setPage(1) }}
-            />
+              onChange={e => setFilterAccion(e.target.value)}
+            >
+              <option value="">Todas las acciones</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+              <option value="ENTRADA">ENTRADA</option>
+            </Select>
+            <Select
+              label="Tabla"
+              value={filterTabla}
+              onChange={e => setFilterTabla(e.target.value)}
+            >
+              <option value="">Todas las tablas</option>
+              {Object.entries(TABLA_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </Select>
           </div>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="mt-3 flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors"
+            >
+              <X className="w-3 h-3" /> Limpiar filtros
+            </button>
+          )}
         </CardBody>
       </Card>
 
@@ -129,36 +205,36 @@ export default function Auditoria() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {paginated.length === 0 && (
+              {loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />Cargando…
+                  </td>
+                </tr>
+              )}
+              {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-slate-400">No hay registros con los filtros seleccionados</td>
                 </tr>
               )}
-              {paginated.map(a => {
-                const u = usuarios.find(u => u.id === a.usuario_id)
-                return (
-                  <tr
-                    key={a.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
-                    onClick={() => setSelected(a)}
-                  >
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDateTime(a.created_at)}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                      {u ? `${u.nombre} ${u.apellido}` : `#${a.usuario_id}`}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={ACCION_BADGE[a.accion] ?? 'neutral'}>{a.accion}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                      {TABLA_LABELS[a.tabla] ?? a.tabla}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-400 font-plate">#{a.registro_id}</td>
-                    <td className="px-4 py-3">
-                      <Eye className="w-4 h-4 text-slate-400" />
-                    </td>
-                  </tr>
-                )
-              })}
+              {rows.map(a => (
+                <tr
+                  key={a.id}
+                  className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+                  onClick={() => setSelected(a)}
+                >
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDateTime(a.created_at)}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{a.usuario_nombre ?? `#${a.usuario_id}`}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant={ACCION_BADGE[a.accion] ?? 'neutral'}>{a.accion}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {TABLA_LABELS[a.tabla] ?? a.tabla}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-400 font-plate">#{a.registro_id}</td>
+                  <td className="px-4 py-3"><Eye className="w-4 h-4 text-slate-400" /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -166,31 +242,21 @@ export default function Auditoria() {
         {/* Paginación */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-700">
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<ChevronLeft className="w-4 h-4" />}
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-            >
+            <Button variant="secondary" size="sm" icon={<ChevronLeft className="w-4 h-4" />}
+              disabled={page === 1 || loading} onClick={() => fetchData(page - 1)}>
               Anterior
             </Button>
             <span className="text-sm text-slate-500">Página {page} de {totalPages}</span>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page === totalPages}
-              onClick={() => setPage(p => p + 1)}
-            >
-              Siguiente
-              <ChevronRight className="w-4 h-4" />
+            <Button variant="secondary" size="sm" disabled={page === totalPages || loading}
+              onClick={() => fetchData(page + 1)}>
+              Siguiente <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         )}
       </Card>
 
       {/* Modal detalle */}
-      <AuditoriaModal registro={selected} usuarios={usuarios} onClose={() => setSelected(null)} />
+      <AuditoriaModal registro={selected} onClose={() => setSelected(null)} />
     </div>
   )
 }
@@ -223,9 +289,8 @@ function JsonDiff({ antes, nuevo }) {
   )
 }
 
-function AuditoriaModal({ registro, usuarios, onClose }) {
+function AuditoriaModal({ registro, onClose }) {
   if (!registro) return null
-  const u = usuarios.find(u => u.id === registro.usuario_id)
   return (
     <Modal open={!!registro} onClose={onClose} title={`Auditoría #${registro.id}`} size="xl">
       <div className="p-6 space-y-4">
@@ -236,7 +301,7 @@ function AuditoriaModal({ registro, usuarios, onClose }) {
           </div>
           <div>
             <p className="text-xs uppercase font-medium text-slate-400 mb-0.5">Usuario</p>
-            <p className="font-medium text-slate-800 dark:text-slate-200">{u ? `${u.nombre} ${u.apellido}` : `#${registro.usuario_id}`}</p>
+            <p className="font-medium text-slate-800 dark:text-slate-200">{registro.usuario_nombre ?? `#${registro.usuario_id}`}</p>
           </div>
           <div>
             <p className="text-xs uppercase font-medium text-slate-400 mb-0.5">Acción</p>

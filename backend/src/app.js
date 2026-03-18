@@ -1,4 +1,13 @@
 require('dotenv').config()
+
+// ─── Validación de variables de entorno requeridas ────────────────────────────
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET']
+const missingEnv = REQUIRED_ENV.filter(k => !process.env[k])
+if (missingEnv.length) {
+  console.error(`[startup] Variables de entorno faltantes: ${missingEnv.join(', ')}`)
+  process.exit(1)
+}
+
 const express      = require('express')
 const cors         = require('cors')
 const helmet       = require('helmet')
@@ -8,7 +17,20 @@ const rateLimit = require('express-rate-limit')
 const app = express()
 
 // ─── Security headers ─────────────────────────────────────────────────────────
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'none'"],
+      styleSrc:    ["'none'"],
+      imgSrc:      ["'none'"],
+      connectSrc:  ["'self'"],
+      objectSrc:   ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'same-origin' },
+}))
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
@@ -44,6 +66,20 @@ app.use('/api/auth/login', rateLimit({
   legacyHeaders: false,
   message: { error: 'Demasiados intentos de inicio de sesión, intenta en 15 minutos.' },
 }))
+
+// ─── Rate limiting para operaciones de escritura ──────────────────────────────
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas operaciones, intenta más tarde.' },
+})
+app.use('/api/despachos',    writeLimiter)
+app.use('/api/vehiculos',    writeLimiter)
+app.use('/api/productos',    writeLimiter)
+app.use('/api/dependencias', writeLimiter)
+app.use('/api/usuarios',     writeLimiter)
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }))

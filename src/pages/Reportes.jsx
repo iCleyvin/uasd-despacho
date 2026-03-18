@@ -5,6 +5,8 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
+import AccessDenied from '../components/ui/AccessDenied'
 import { CATEGORIA_LABELS, formatDate, formatNumber } from '../utils/format'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -456,7 +458,10 @@ function TabInventario({ productos }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Reportes() {
   const { despachos, productos, vehiculos, dependencias } = useData()
+  const { hasPermiso } = useAuth()
   const [activeTab, setActiveTab] = useState('diario')
+
+  if (!hasPermiso('reportes.ver')) return <AccessDenied />
 
   return (
     <div className="py-6 px-4 max-w-7xl mx-auto">

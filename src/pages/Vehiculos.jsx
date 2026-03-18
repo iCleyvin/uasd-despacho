@@ -2,12 +2,17 @@ import { useState, useMemo } from 'react'
 import { Plus, Edit2, Power, Search, Fuel, LayoutGrid, List } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import { CATEGORIA_LABELS, formatDateTime, formatNumber } from '../utils/format'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card, { CardBody } from '../components/ui/Card'
+import AccessDenied from '../components/ui/AccessDenied'
+import ExportMenu from '../components/ui/ExportMenu'
+import { exportVehiculosPDF } from '../lib/exportPdf'
+import { exportVehiculosCSV } from '../lib/exportCsv'
 
 const TIPO_OPTIONS = ['Sedan', 'Jeepeta', 'Pickup', 'Camion', 'Microbus', 'Minibus', 'Autobus', 'Tren', 'Motocicleta', 'Otro']
 const COMBUSTIBLE_OPTIONS = ['Gasolina', 'Gasoil', 'Electrico', 'Hibrido']
@@ -48,6 +53,8 @@ const EMPTY_FORM = {
 
 export default function Vehiculos() {
   const { vehiculos, dependencias, despachos, productos, crearVehiculo, editarVehiculo, toggleVehiculoActivo } = useData()
+  const { hasPermiso } = useAuth()
+  const canEdit = hasPermiso('vehiculos.editar')
 
   const [filterDep,  setFilterDep]  = useState('')
   const [search,     setSearch]     = useState('')
@@ -64,10 +71,13 @@ export default function Vehiculos() {
     if (search) {
       const q = search.toLowerCase()
       const matchFichaVieja = v.ficha_vieja ? v.ficha_vieja.toLowerCase().includes(q) : false
-      if (!v.placa.toLowerCase().includes(q) && !v.marca.toLowerCase().includes(q) && !v.modelo.toLowerCase().includes(q) && !matchFichaVieja) return false
+      const matchChasis     = v.chasis      ? v.chasis.toLowerCase().includes(q)      : false
+      if (!v.placa.toLowerCase().includes(q) && !v.marca.toLowerCase().includes(q) && !v.modelo.toLowerCase().includes(q) && !matchFichaVieja && !matchChasis) return false
     }
     return true
   }), [vehiculos, filterDep, search])
+
+  if (!hasPermiso('vehiculos.ver')) return <AccessDenied />
 
   function openCreate() {
     setEditTarget(null)
@@ -110,15 +120,19 @@ export default function Vehiculos() {
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setSaving(true)
-    await new Promise(r => setTimeout(r, 350))
-    const payload = { ...form, anio: Number(form.anio), dependencia_id: Number(form.dependencia_id) }
-    if (editTarget) {
-      editarVehiculo(editTarget.id, payload)
-    } else {
-      crearVehiculo(payload)
+    try {
+      const payload = { ...form, anio: Number(form.anio), dependencia_id: Number(form.dependencia_id) }
+      if (editTarget) {
+        await editarVehiculo(editTarget.id, payload)
+      } else {
+        await crearVehiculo(payload)
+      }
+      setFormModal(false)
+    } catch (err) {
+      setErrors({ placa: err?.response?.data?.error ?? 'Error al guardar' })
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setFormModal(false)
   }
 
   function field(key, val) {
@@ -135,15 +149,20 @@ export default function Vehiculos() {
             {vehiculos.filter(v => v.activo).length} activos · {vehiculos.filter(v => !v.activo).length} inactivos
           </p>
         </div>
-        <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
-          Nuevo Vehículo
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu onPDF={() => exportVehiculosPDF(filtered)} onCSV={() => exportVehiculosCSV(filtered)} />
+          {canEdit && (
+            <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+              Nuevo Vehículo
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <Input
-          placeholder="Buscar placa, ficha vieja, marca…"
+          placeholder="Buscar placa, ficha, marca, chasis…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           icon={<Search className="w-4 h-4" />}
@@ -232,17 +251,9 @@ export default function Vehiculos() {
                         <Badge variant={v.activo ? 'success' : 'neutral'}>{v.activo ? 'Activo' : 'Inactivo'}</Badge>
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-2">
+                        {canEdit && (
                           <Button variant="secondary" size="sm" icon={<Edit2 className="w-3.5 h-3.5" />} onClick={() => openEdit(v)}>Editar</Button>
-                          <Button
-                            variant={v.activo ? 'danger' : 'secondary'}
-                            size="sm"
-                            icon={<Power className="w-3.5 h-3.5" />}
-                            onClick={() => { if (confirm(`¿${v.activo ? 'Desactivar' : 'Activar'} vehículo ${v.placa}?`)) toggleVehiculoActivo(v.id) }}
-                          >
-                            {v.activo ? 'Desactivar' : 'Activar'}
-                          </Button>
-                        </div>
+                        )}
                       </td>
                     </tr>
                   )
@@ -306,29 +317,19 @@ export default function Vehiculos() {
                 <p className="text-xs text-slate-400 truncate">{dep?.nombre ?? '—'}</p>
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Edit2 className="w-3.5 h-3.5" />}
-                    className="flex-1"
-                    onClick={() => openEdit(v)}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    variant={v.activo ? 'danger' : 'secondary'}
-                    size="sm"
-                    icon={<Power className="w-3.5 h-3.5" />}
-                    onClick={() => {
-                      if (confirm(`¿${v.activo ? 'Desactivar' : 'Activar'} vehículo ${v.placa}?`)) {
-                        toggleVehiculoActivo(v.id)
-                      }
-                    }}
-                  >
-                    {v.activo ? 'Desactivar' : 'Activar'}
-                  </Button>
-                </div>
+                {canEdit && (
+                  <div className="flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Edit2 className="w-3.5 h-3.5" />}
+                      className="flex-1"
+                      onClick={() => openEdit(v)}
+                    >
+                      Editar
+                    </Button>
+                  </div>
+                )}
               </CardBody>
             </Card>
           )
@@ -346,6 +347,9 @@ export default function Vehiculos() {
         dependencias={dependencias}
         despachos={despachos}
         productos={productos}
+        canEdit={canEdit}
+        onToggle={async () => { await toggleVehiculoActivo(detailV.id); setDetailV(null) }}
+        onEdit={v => { setDetailV(null); openEdit(v) }}
         onClose={() => setDetailV(null)}
       />
 
@@ -471,7 +475,7 @@ export default function Vehiculos() {
   )
 }
 
-function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, onClose }) {
+function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, canEdit, onToggle, onEdit, onClose }) {
   if (!vehiculo) return null
   const dep = dependencias.find(d => d.id === vehiculo.dependencia_id)
 
@@ -557,7 +561,29 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, onC
           )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          {canEdit ? (
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                icon={<Edit2 className="w-4 h-4" />}
+                onClick={() => { onClose(); onEdit(vehiculo) }}
+              >
+                Editar
+              </Button>
+              <Button
+                variant={vehiculo.activo ? 'danger' : 'secondary'}
+                icon={<Power className="w-4 h-4" />}
+                onClick={() => {
+                  if (confirm(`¿${vehiculo.activo ? 'Desactivar' : 'Activar'} vehículo ${vehiculo.placa}?`)) {
+                    onToggle()
+                  }
+                }}
+              >
+                {vehiculo.activo ? 'Desactivar' : 'Activar'}
+              </Button>
+            </div>
+          ) : <span />}
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
         </div>
       </div>

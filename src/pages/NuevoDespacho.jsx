@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CheckCircle, Printer, RotateCcw, Search, AlertTriangle, Truck } from 'lucide-react'
+import { CheckCircle, Printer, RotateCcw, Search, AlertTriangle, Truck, ClipboardCheck } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +8,8 @@ import Button from '../components/ui/Button'
 import Input, { Select } from '../components/ui/Input'
 import Badge from '../components/ui/Badge'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
+import Modal from '../components/ui/Modal'
+import AccessDenied from '../components/ui/AccessDenied'
 import { api } from '../lib/api'
 
 const CATEGORIA_BADGE = {
@@ -50,7 +52,7 @@ const EMPTY_FORM = {
 }
 
 export default function NuevoDespacho() {
-  const { user } = useAuth()
+  const { user, hasPermiso } = useAuth()
   const { vehiculos, productos, dependencias, crearDespacho } = useData()
 
   const [form, setForm]             = useState(EMPTY_FORM)
@@ -61,6 +63,7 @@ export default function NuevoDespacho() {
   const [submitting, setSubmitting] = useState(false)
   const [ticket, setTicket]         = useState(null)
   const [despachoSemana, setDespachoSemana]     = useState(null)
+  const [confirmando, setConfirmando]           = useState(false)
   const searchRef = useRef(null)
   const dropdownRef = useRef(null)
 
@@ -104,6 +107,8 @@ export default function NuevoDespacho() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  if (!hasPermiso('despachos.crear')) return <AccessDenied />
+
   function handleVehiculoSelect(v) {
     setSelectedVehiculo(v)
     setForm(f => ({ ...f, vehiculo_id: v.id }))
@@ -131,11 +136,15 @@ export default function NuevoDespacho() {
     return e
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setErrors({})
+    setConfirmando(true)
+  }
+
+  async function handleConfirmar() {
     setSubmitting(true)
     try {
       const despacho = await crearDespacho({
@@ -149,13 +158,15 @@ export default function NuevoDespacho() {
         km_vehiculo:     form.km_vehiculo ? Number(form.km_vehiculo) : null,
         observaciones:   form.observaciones || null,
       })
+      setConfirmando(false)
       setTicket({
         despacho,
-        vehiculo:  selectedVehiculo,
-        producto:  productoSeleccionado,
+        vehiculo:    selectedVehiculo,
+        producto:    productoSeleccionado,
         despachador: user ? `${user.nombre} ${user.apellido}` : 'Sistema',
       })
     } catch (err) {
+      setConfirmando(false)
       setErrors({ submit: err.message })
     } finally {
       setSubmitting(false)
@@ -534,12 +545,109 @@ export default function NuevoDespacho() {
           type="submit"
           variant="primary"
           size="lg"
-          loading={submitting}
           className="w-full"
+          icon={<ClipboardCheck className="w-5 h-5" />}
         >
-          Registrar Despacho
+          Revisar y Registrar
         </Button>
       </form>
+
+      {/* Modal de confirmación */}
+      <Modal
+        open={confirmando}
+        onClose={() => setConfirmando(false)}
+        title="Confirmar Despacho"
+        size="md"
+      >
+        <div className="p-6 space-y-5">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Revise los datos antes de confirmar. Una vez registrado no se puede modificar.
+          </p>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden text-sm">
+            {/* Vehículo */}
+            <div className="bg-slate-50 dark:bg-slate-900/40 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wide">Vehículo</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Placa</p>
+                <p className="font-plate font-bold text-primary-600 text-lg leading-none">{selectedVehiculo?.placa}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Vehículo</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200">{selectedVehiculo?.marca} {selectedVehiculo?.modelo}</p>
+                <p className="text-xs text-slate-400">{selectedVehiculo?.anio} · {selectedVehiculo?.tipo}</p>
+              </div>
+              {dep && (
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-400 mb-0.5">Dependencia</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{dep.nombre}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Producto */}
+            <div className="bg-slate-50 dark:bg-slate-900/40 px-4 py-2 border-t border-b border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wide">Producto</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Producto</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200">{productoSeleccionado?.nombre}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Cantidad</p>
+                <p className="font-bold text-2xl text-primary-600 leading-none">{formatNumber(Number(form.cantidad), 0)}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{productoSeleccionado?.unidad}</p>
+              </div>
+            </div>
+
+            {/* Receptor */}
+            <div className="bg-slate-50 dark:bg-slate-900/40 px-4 py-2 border-t border-b border-slate-200 dark:border-slate-700">
+              <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wide">Receptor</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Solicitado por</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200">{form.solicitado_por}</p>
+              </div>
+              {form.cedula_receptor && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Cédula</p>
+                  <p className="font-plate text-slate-800 dark:text-slate-200">{form.cedula_receptor}</p>
+                </div>
+              )}
+              {form.km_vehiculo && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Km vehículo</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{formatNumber(Number(form.km_vehiculo), 0)} km</p>
+                </div>
+              )}
+              {form.observaciones && (
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-400 mb-0.5">Observaciones</p>
+                  <p className="text-slate-700 dark:text-slate-300">{form.observaciones}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold text-sm hover:border-primary-500 hover:text-primary-600 transition-colors"
+            >
+              Editar
+            </button>
+            <Button variant="primary" className="flex-1 rounded-xl" loading={submitting} onClick={handleConfirmar}
+              icon={<CheckCircle className="w-4 h-4" />}>
+              Confirmar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
