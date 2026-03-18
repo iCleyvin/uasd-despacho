@@ -50,6 +50,22 @@ function validar(req, res, next) {
   next()
 }
 
+// Usuarios en línea — visible para admin y supervisor
+router.get('/online', requireAuth, requireRole('admin', 'supervisor'), async (_req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT id, nombre, apellido, rol, last_seen
+      FROM usuarios
+      WHERE activo = true AND last_seen > NOW() - INTERVAL '3 minutes'
+      ORDER BY last_seen DESC
+    `)
+    res.json(rows)
+  } catch (err) {
+    console.error('[usuarios GET /online]', err.message)
+    res.status(500).json({ error: 'Error al obtener usuarios en línea' })
+  }
+})
+
 router.get('/', requireAuth, requireRole('admin'), async (_req, res) => {
   try {
     const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios ORDER BY created_at`)

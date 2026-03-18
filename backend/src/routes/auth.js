@@ -40,6 +40,7 @@ router.post('/login', async (req, res) => {
     const payload = { id: user.id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol, token_version: user.token_version ?? 1 }
     const token   = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN ?? '8h' })
 
+    await db.query('UPDATE usuarios SET last_seen = NOW() WHERE id = $1', [user.id])
     res.cookie(COOKIE_NAME, token, COOKIE_OPTS)
     res.json({ user: { ...payload, permisos: user.permisos ?? [] } })
   } catch (err) {
@@ -63,6 +64,16 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[auth/me]', err.message)
     res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// ── Heartbeat de presencia ─────────────────────────────────────────────────────
+router.post('/ping', requireAuth, async (req, res) => {
+  try {
+    await db.query('UPDATE usuarios SET last_seen = NOW() WHERE id = $1', [req.user.id])
+    res.json({ ok: true })
+  } catch {
+    res.json({ ok: false })
   }
 })
 

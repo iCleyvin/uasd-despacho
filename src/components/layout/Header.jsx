@@ -1,13 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
-import { Menu, Bell, AlertTriangle, X } from 'lucide-react'
+import { Menu, Bell, AlertTriangle, X, Circle } from 'lucide-react'
 import UserMenu from './UserMenu'
 import { useData } from '../../context/DataContext'
+import { useAuth } from '../../context/AuthContext'
+import { api } from '../../lib/api'
+
+const ROL_LABEL = { admin: 'Admin', supervisor: 'Supervisor', despachador: 'Despachador' }
 
 export default function Header({ onMenuClick }) {
   const { productos } = useData()
+  const { user } = useAuth()
   const lowStock = productos.filter(p => p.activo && Number(p.stock_actual) <= Number(p.stock_minimo))
   const [open, setOpen] = useState(false)
+  const [onlineUsers, setOnlineUsers] = useState([])
   const ref = useRef(null)
+
+  const canSeeOnline = user?.rol === 'admin' || user?.rol === 'supervisor'
+
+  // Cargar usuarios en línea al abrir el dropdown (y refrescar cada 30s mientras está abierto)
+  useEffect(() => {
+    if (!open || !canSeeOnline) return
+    const fetch = () => api.get('/usuarios/online').then(setOnlineUsers).catch(() => {})
+    fetch()
+    const id = setInterval(fetch, 30_000)
+    return () => clearInterval(id)
+  }, [open, canSeeOnline])
 
   useEffect(() => {
     function handler(e) {
@@ -60,8 +77,9 @@ export default function Header({ onMenuClick }) {
               </div>
 
               {/* Contenido */}
+              {/* Stock bajo */}
               {lowStock.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-slate-400">
+                <div className="px-4 py-4 text-center text-sm text-slate-400">
                   Sin alertas de stock
                 </div>
               ) : (
@@ -72,9 +90,9 @@ export default function Header({ onMenuClick }) {
                       {lowStock.length} producto{lowStock.length > 1 ? 's' : ''} con stock bajo
                     </span>
                   </div>
-                  <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-64 overflow-y-auto">
+                  <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-48 overflow-y-auto">
                     {lowStock.map(p => (
-                      <li key={p.id} className="px-4 py-3">
+                      <li key={p.id} className="px-4 py-2.5">
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{p.nombre}</p>
                         <p className="text-xs text-red-500 mt-0.5">
                           Stock: {Number(p.stock_actual).toFixed(0)} {p.unidad}
@@ -83,6 +101,35 @@ export default function Header({ onMenuClick }) {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Usuarios en línea — solo admin/supervisor */}
+              {canSeeOnline && (
+                <div className="border-t border-slate-100 dark:border-slate-700">
+                  <div className="px-4 py-2 flex items-center gap-2">
+                    <Circle className="w-2 h-2 fill-green-500 text-green-500 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Usuarios en línea ({onlineUsers.length})
+                    </span>
+                  </div>
+                  {onlineUsers.length === 0 ? (
+                    <p className="px-4 pb-3 text-xs text-slate-400">Nadie más conectado</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-40 overflow-y-auto">
+                      {onlineUsers.map(u => (
+                        <li key={u.id} className="px-4 py-2.5 flex items-center gap-2.5">
+                          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                              {u.nombre} {u.apellido}
+                            </p>
+                            <p className="text-xs text-slate-400">{ROL_LABEL[u.rol] ?? u.rol}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>

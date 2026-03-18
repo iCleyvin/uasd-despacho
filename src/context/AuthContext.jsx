@@ -55,6 +55,14 @@ export function AuthProvider({ children }) {
     return (user.permisos ?? []).includes(permiso)
   }, [user])
 
+  // Heartbeat de presencia: actualiza last_seen cada 60s mientras el usuario está activo
+  useEffect(() => {
+    if (!isAuthenticated) return
+    api.post('/auth/ping').catch(() => {})
+    const id = setInterval(() => api.post('/auth/ping').catch(() => {}), 60_000)
+    return () => clearInterval(id)
+  }, [isAuthenticated])
+
   // Mientras se verifica la sesión inicial, no renderizar children para evitar flash
   if (!verified) return null
 

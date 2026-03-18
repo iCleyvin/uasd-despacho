@@ -382,6 +382,9 @@ async function run() {
     WHERE rol = 'despachador' AND (permisos IS NULL OR permisos = '[]'::jsonb)
   `)
 
+  // Columna para presencia en línea
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NULL`)
+
   // Restricción: el stock no puede ser negativo
   await db.query(`
     DO $$ BEGIN
