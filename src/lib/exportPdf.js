@@ -6,7 +6,7 @@ const ALT_ROW = [248, 250, 252] // slate-50
 
 async function loadLogo() {
   try {
-    const res = await fetch('/logolog.png')
+    const res = await fetch('/escudo.png')
     const blob = await res.blob()
     return new Promise(resolve => {
       const reader = new FileReader()
@@ -23,33 +23,33 @@ async function crearDoc(titulo, orientacion = 'landscape') {
 
   const logoData = await loadLogo()
   if (logoData) {
-    const logoH = 20
-    const logoW = 42
-    doc.addImage(logoData, 'PNG', pageW - logoW - 14, 6, logoW, logoH)
+    doc.addImage(logoData, 'PNG', pageW - 30, 5, 22, 22)
   }
 
   doc.setFontSize(15)
   doc.setFont('helvetica', 'bold')
-  doc.text('UASD — Sistema de Despacho', 14, 18)
+  doc.text('UASD — Sistema de Despacho', 14, 14)
 
-  doc.setFontSize(10)
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.text('Departamento de Suministros', 14, 25)
+  doc.setTextColor(80)
+  doc.text('Universidad Autónoma de Santo Domingo · Departamento de Suministros', 14, 20)
+  doc.setTextColor(0)
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
-  doc.text(titulo, 14, 32)
+  doc.text(titulo, 14, 28)
 
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(130)
-  doc.text(`Generado el ${fecha}`, 14, 38)
+  doc.text(`Generado el ${fecha}`, 14, 34)
   doc.setTextColor(0)
 
   return doc
 }
 
-function tabla(doc, head, body, startY = 44) {
+function tabla(doc, head, body, startY = 40) {
   autoTable(doc, {
     startY,
     head: [head],
