@@ -102,6 +102,66 @@ export function exportDependenciasPDF(dependencias) {
   guardar(doc, 'dependencias')
 }
 
+// ─── Auditoría ────────────────────────────────────────────────────────────────
+const TABLA_LABELS_PDF = {
+  despachos: 'Despachos', productos: 'Productos', vehiculos: 'Vehículos',
+  dependencias: 'Dependencias', usuarios: 'Usuarios',
+}
+
+export function exportAuditoriaPDF(rows) {
+  const doc = crearDoc(`Registro de Auditoría (${rows.length} registros)`, 'landscape')
+  tabla(doc,
+    ['Fecha/Hora', 'Usuario', 'Acción', 'Tabla', 'Registro ID'],
+    rows.map(a => [
+      a.created_at ? new Date(a.created_at).toLocaleString('es-DO') : '—',
+      a.usuario_nombre ?? `#${a.usuario_id}`,
+      a.accion,
+      TABLA_LABELS_PDF[a.tabla] ?? a.tabla,
+      `#${a.registro_id}`,
+    ])
+  )
+  guardar(doc, 'auditoria')
+}
+
+// ─── Reportes ─────────────────────────────────────────────────────────────────
+const MESES_PDF = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+export function exportReporteDiarioPDF(datos, fecha) {
+  const doc = crearDoc(`Consumo Diario — ${fecha} (${datos.length} productos)`, 'portrait')
+  tabla(doc,
+    ['Producto', 'Categoría', 'Total', 'Unidad'],
+    datos.map(d => [d.nombre, d.categoria ?? '—', Number(d.total).toFixed(0), d.unidad])
+  )
+  guardar(doc, `consumo_diario_${fecha}`)
+}
+
+export function exportReporteMensualPDF(datos, mes, año) {
+  const doc = crearDoc(`Consumo Mensual — ${MESES_PDF[mes - 1]} ${año} (${datos.length} productos)`, 'portrait')
+  tabla(doc,
+    ['Producto', 'Categoría', 'Total', 'Unidad', 'Nº Despachos'],
+    datos.map(d => [d.nombre, d.categoria ?? '—', Number(d.total).toFixed(0), d.unidad, d.despachos])
+  )
+  guardar(doc, `consumo_mensual_${año}-${String(mes).padStart(2, '0')}`)
+}
+
+export function exportReporteVehiculoPDF(datos, vehiculo, desde, hasta) {
+  const titulo = vehiculo
+    ? `Despachos — ${vehiculo.placa} ${vehiculo.marca} ${vehiculo.modelo} · ${desde} al ${hasta}`
+    : `Despachos por Vehículo · ${desde} al ${hasta}`
+  const doc = crearDoc(titulo, 'landscape')
+  tabla(doc,
+    ['Fecha', 'Producto', 'Cantidad', 'Unidad', 'Solicitado por'],
+    datos.map(d => [
+      d.fecha_despacho ? d.fecha_despacho.slice(0, 10) : '—',
+      d.producto_nombre,
+      Number(d.cantidad).toFixed(0),
+      d.unidad,
+      d.solicitado_por,
+    ])
+  )
+  guardar(doc, `vehiculo_${vehiculo?.placa ?? 'reporte'}_${desde}_${hasta}`)
+}
+
 // ─── Despachos ────────────────────────────────────────────────────────────────
 export function exportDespachosPDF(rows) {
   const doc = crearDoc(`Historial de Despachos (${rows.length} registros)`, 'landscape')

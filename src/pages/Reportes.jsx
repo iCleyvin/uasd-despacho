@@ -1,5 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Download, BarChart2, Loader2 } from 'lucide-react'
+import { BarChart2, Loader2 } from 'lucide-react'
+import ExportMenu from '../components/ui/ExportMenu'
+import {
+  exportReporteDiarioPDF, exportReporteMensualPDF,
+  exportReporteVehiculoPDF, exportInventarioPDF,
+} from '../lib/exportPdf'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
@@ -75,7 +80,7 @@ function TabDiario() {
 
   const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total }))
 
-  function exportar() {
+  function exportarCSV() {
     downloadCSV(
       datos.map(d => [fecha, d.nombre, CATEGORIA_LABELS[d.categoria] ?? d.categoria, d.total, d.unidad]),
       ['Fecha', 'Producto', 'Categoría', 'Cantidad', 'Unidad'],
@@ -96,9 +101,10 @@ function TabDiario() {
           />
         </div>
         {datos.length > 0 && (
-          <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
-            Exportar CSV
-          </Button>
+          <ExportMenu
+            onPDF={() => exportReporteDiarioPDF(datos, fecha)}
+            onCSV={exportarCSV}
+          />
         )}
       </div>
 
@@ -191,7 +197,7 @@ function TabMensual({ productos }) {
 
   const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total, despachos: d.despachos }))
 
-  function exportar() {
+  function exportarCSV() {
     downloadCSV(
       datos.map(d => [prefix, d.nombre, CATEGORIA_LABELS[d.categoria], d.total, d.unidad, d.despachos]),
       ['Mes', 'Producto', 'Categoría', 'Total', 'Unidad', 'Nº Despachos'],
@@ -227,9 +233,11 @@ function TabMensual({ productos }) {
             />
           </div>
         </div>
-        <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
-          Exportar CSV
-        </Button>
+        <ExportMenu
+          onPDF={() => exportReporteMensualPDF(datos, mes, año)}
+          onCSV={exportarCSV}
+          disabled={datos.length === 0}
+        />
       </div>
 
       {loading ? (
@@ -326,7 +334,7 @@ function TabVehiculo({ vehiculos, dependencias }) {
   const v = vehiculos.find(v => v.id === Number(vehiculoId))
   const dep = v ? dependencias.find(d => d.id === v.dependencia_id) : null
 
-  function exportar() {
+  function exportarCSV() {
     downloadCSV(
       datos.map(d => [d.fecha_despacho.slice(0, 10), v?.placa, d.producto_nombre, d.cantidad, d.unidad, d.solicitado_por]),
       ['Fecha', 'Placa', 'Producto', 'Cantidad', 'Unidad', 'Solicitado por'],
@@ -359,9 +367,10 @@ function TabVehiculo({ vehiculos, dependencias }) {
             className="rounded-lg border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-600/40" />
         </div>
         {vehiculoId && datos.length > 0 && (
-          <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
-            Exportar CSV
-          </Button>
+          <ExportMenu
+            onPDF={() => exportReporteVehiculoPDF(datos, v, desde, hasta)}
+            onCSV={exportarCSV}
+          />
         )}
       </div>
 
@@ -452,7 +461,7 @@ function TabInventario({ productos }) {
     return 'OK'
   }
 
-  function exportar() {
+  function exportarCSV() {
     downloadCSV(
       productos.map(p => [p.nombre, CATEGORIA_LABELS[p.categoria], p.stock_actual, p.stock_minimo, p.unidad, stockLabel(p)]),
       ['Producto', 'Categoría', 'Stock Actual', 'Stock Mínimo', 'Unidad', 'Estado'],
@@ -463,9 +472,11 @@ function TabInventario({ productos }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
-          Exportar CSV
-        </Button>
+        <ExportMenu
+          onPDF={() => exportInventarioPDF(productos)}
+          onCSV={exportarCSV}
+          disabled={productos.length === 0}
+        />
       </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm">

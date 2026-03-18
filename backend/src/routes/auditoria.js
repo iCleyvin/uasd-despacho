@@ -19,7 +19,7 @@ const validarFiltros = [
   query('fecha_desde').optional().isISO8601().withMessage('fecha_desde inválida'),
   query('fecha_hasta').optional().isISO8601().withMessage('fecha_hasta inválida'),
   query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 200 }),
+  query('limit').optional().isInt({ min: 1, max: 1000 }),
 ]
 
 function buildWhere(q) {

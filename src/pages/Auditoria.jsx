@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Eye, ShieldOff, Download, Loader2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Eye, ShieldOff, Loader2, X } from 'lucide-react'
+import ExportMenu from '../components/ui/ExportMenu'
+import { exportAuditoriaPDF } from '../lib/exportPdf'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -39,7 +41,8 @@ export default function Auditoria() {
   const [loading,   setLoading]   = useState(false)
   const [page,      setPage]      = useState(1)
   const [selected,  setSelected]  = useState(null)
-  const [exporting, setExporting] = useState(false)
+  const [exporting,    setExporting]    = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const [filterUsuario, setFilterUsuario] = useState('')
   const [filterDesde,   setFilterDesde]   = useState('')
@@ -104,6 +107,18 @@ export default function Auditoria() {
     finally { setExporting(false) }
   }
 
+  async function exportPDF() {
+    setExportingPdf(true)
+    try {
+      const qs = new URLSearchParams(buildParams(1))
+      qs.delete('page')
+      qs.set('limit', '1000')
+      const res = await api.get('/auditoria?' + qs)
+      exportAuditoriaPDF(res.data ?? [])
+    } catch { /* silent */ }
+    finally { setExportingPdf(false) }
+  }
+
   // Redirect non-admin/supervisor
   if (!hasRole('admin', 'supervisor')) {
     return (
@@ -125,10 +140,12 @@ export default function Auditoria() {
             {loading ? 'Cargando…' : `${total.toLocaleString()} registro${total !== 1 ? 's' : ''} encontrados`}
           </p>
         </div>
-        <Button variant="secondary" icon={exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          onClick={exportCSV} disabled={exporting || total === 0}>
-          {exporting ? 'Exportando…' : 'Exportar CSV'}
-        </Button>
+        <ExportMenu
+          onPDF={exportPDF}
+          onCSV={exportCSV}
+          loading={exporting || exportingPdf}
+          disabled={total === 0}
+        />
       </div>
 
       {/* Filtros */}
