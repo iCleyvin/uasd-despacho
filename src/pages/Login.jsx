@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, Fuel } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Fuel, ShieldAlert } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import Button from '../components/ui/Button'
@@ -14,6 +14,9 @@ export default function Login() {
   const [showPw, setShowPw]   = useState(false)
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
+
+  const kicked = !!localStorage.getItem('session_kicked')
+  if (kicked) localStorage.removeItem('session_kicked')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -41,12 +44,27 @@ export default function Login() {
       </button>
 
       {/* UASD Logo */}
-      <img
-        src="/logolog.png"
-        alt="Universidad Autónoma de Santo Domingo"
-        className="h-28 object-contain dark:brightness-90"
-        draggable={false}
-      />
+      <div className="dark:bg-white dark:rounded-2xl dark:px-5 dark:py-3">
+        <img
+          src="/logolog.png"
+          alt="Universidad Autónoma de Santo Domingo"
+          className="h-28 object-contain"
+          draggable={false}
+        />
+      </div>
+
+      {/* Aviso de cierre forzado por admin */}
+      {kicked && (
+        <div className="w-full max-w-sm flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl shadow-sm">
+          <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Sesión cerrada por el administrador</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              Un administrador ha cerrado tu sesión. Por favor inicia sesión nuevamente.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Card */}
       <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">

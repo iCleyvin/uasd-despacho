@@ -55,6 +55,16 @@ export function AuthProvider({ children }) {
     return (user.permisos ?? []).includes(permiso)
   }, [user])
 
+  // Escuchar cierre forzado de sesión por el administrador
+  useEffect(() => {
+    function handler() {
+      localStorage.removeItem(USER_KEY)
+      setUser(null)
+    }
+    window.addEventListener('auth:kicked', handler)
+    return () => window.removeEventListener('auth:kicked', handler)
+  }, [])
+
   // Heartbeat de presencia: actualiza last_seen cada 60s mientras el usuario está activo
   useEffect(() => {
     if (!isAuthenticated) return

@@ -15,6 +15,10 @@ async function request(method, path, body) {
   if (!res.ok) {
     const err = new Error(data.error ?? `Error ${res.status}`)
     err.status = res.status
+    if (res.status === 401 && data.error?.includes('invalidada')) {
+      localStorage.setItem('session_kicked', '1')
+      window.dispatchEvent(new CustomEvent('auth:kicked'))
+    }
     throw err
   }
 
