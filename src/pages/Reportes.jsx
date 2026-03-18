@@ -55,11 +55,9 @@ function TabDiario() {
     setLoading(true)
     setError('')
     try {
-      const url = `/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=200`
-      const res = await api.get(url)
-      console.log('[Reportes Diario] URL:', url, '→ res:', res)
+      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=200`)
       setRows(Array.isArray(res.data) ? res.data : [])
-    } catch (err) { console.error('[Reportes Diario] Error:', err); setError(err.message); setRows([]) }
+    } catch (err) { setError(err.message); setRows([]) }
     finally { setLoading(false) }
   }, [])
 
@@ -109,7 +107,7 @@ function TabDiario() {
       ) : error ? (
         <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
       ) : datos.length === 0 ? (
-        <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para esta fecha. (API devolvió {rows.length} registros)</p></CardBody></Card>
+        <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para esta fecha.</p></CardBody></Card>
       ) : (
         <>
           <Card>
@@ -170,11 +168,9 @@ function TabMensual({ productos }) {
     setLoading(true)
     setError('')
     try {
-      const url = `/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=200`
-      const res = await api.get(url)
-      console.log('[Reportes Mensual] URL:', url, '→ res:', res)
+      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=200`)
       setRows(Array.isArray(res.data) ? res.data : [])
-    } catch (err) { console.error('[Reportes Mensual] Error:', err); setError(err.message); setRows([]) }
+    } catch (err) { setError(err.message); setRows([]) }
     finally { setLoading(false) }
   }, [])
 
@@ -241,7 +237,7 @@ function TabMensual({ productos }) {
       ) : error ? (
         <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
       ) : datos.length === 0 ? (
-        <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este mes. (API devolvió {rows.length} registros)</p></CardBody></Card>
+        <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este mes.</p></CardBody></Card>
       ) : (
         <>
           <Card>
