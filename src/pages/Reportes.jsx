@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
-import { Download, BarChart2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { Download, BarChart2, Loader2 } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { api } from '../lib/api'
 import AccessDenied from '../components/ui/AccessDenied'
 import { CATEGORIA_LABELS, formatDate, formatNumber } from '../utils/format'
 import Button from '../components/ui/Button'
@@ -43,27 +44,38 @@ function downloadCSV(rows, headers, filename) {
 const CHART_COLORS = ['#1a3c8f', '#c8a951', '#22c55e', '#f97316', '#a855f7']
 
 // ── Diario ────────────────────────────────────────────────────────────────────
-function TabDiario({ despachos, productos }) {
+function TabDiario() {
   const today = new Date().toISOString().slice(0, 10)
-  const [fecha, setFecha] = useState(today)
+  const [fecha,   setFecha]   = useState(today)
+  const [rows,    setRows]    = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const fetch = useCallback(async (f) => {
+    setLoading(true)
+    try {
+      const res = await api.get(`/despachos?fecha_desde=${f}&fecha_hasta=${f}&limit=500`)
+      setRows(res.data ?? [])
+    } catch { setRows([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { fetch(fecha) }, [fecha, fetch])
 
   const datos = useMemo(() => {
-    const filtrados = despachos.filter(d => d.fecha_despacho.startsWith(fecha))
     const map = {}
-    filtrados.forEach(d => {
-      const p = productos.find(p => p.id === d.producto_id)
-      if (!p) return
-      if (!map[p.id]) map[p.id] = { nombre: p.nombre, categoria: p.categoria, unidad: p.unidad, total: 0 }
-      map[p.id].total += d.cantidad
+    rows.forEach(d => {
+      const key = d.producto_id
+      if (!map[key]) map[key] = { nombre: d.producto_nombre, categoria: d.categoria, unidad: d.unidad, total: 0 }
+      map[key].total += Number(d.cantidad)
     })
     return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [despachos, productos, fecha])
+  }, [rows])
 
   const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total }))
 
   function exportar() {
     downloadCSV(
-      datos.map(d => [fecha, d.nombre, CATEGORIA_LABELS[d.categoria], d.total, d.unidad]),
+      datos.map(d => [fecha, d.nombre, CATEGORIA_LABELS[d.categoria] ?? d.categoria, d.total, d.unidad]),
       ['Fecha', 'Producto', 'Categoría', 'Cantidad', 'Unidad'],
       `consumo_diario_${fecha}.csv`
     )
@@ -81,12 +93,16 @@ function TabDiario({ despachos, productos }) {
             className="rounded-lg border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-600/40"
           />
         </div>
-        <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
-          Exportar CSV
-        </Button>
+        {datos.length > 0 && (
+          <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>
+            Exportar CSV
+          </Button>
+        )}
       </div>
 
-      {datos.length === 0 ? (
+      {loading ? (
+        <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      ) : datos.length === 0 ? (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para esta fecha.</p></CardBody></Card>
       ) : (
         <>
@@ -117,7 +133,7 @@ function TabDiario({ despachos, productos }) {
                 {datos.map((d, i) => (
                   <tr key={i}>
                     <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{d.nombre}</td>
-                    <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[d.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[d.categoria]}</Badge></td>
+                    <td className="px-4 py-3"><Badge variant={CATEGORIA_BADGE[d.categoria] ?? 'neutral'}>{CATEGORIA_LABELS[d.categoria] ?? d.categoria}</Badge></td>
                     <td className="px-4 py-3 text-right font-bold text-primary-600">{formatNumber(d.total, 0)}</td>
                     <td className="px-4 py-3 text-slate-500">{d.unidad}</td>
                   </tr>
@@ -132,25 +148,40 @@ function TabDiario({ despachos, productos }) {
 }
 
 // ── Mensual ───────────────────────────────────────────────────────────────────
-function TabMensual({ despachos, productos }) {
+function TabMensual({ productos }) {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [año, setAño] = useState(now.getFullYear())
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchMensual = useCallback(async (m, y) => {
+    const mesStr = String(m).padStart(2, '0')
+    const lastDay = new Date(y, m, 0).getDate()
+    const fechaDesde = `${y}-${mesStr}-01`
+    const fechaHasta = `${y}-${mesStr}-${String(lastDay).padStart(2, '0')}`
+    setLoading(true)
+    try {
+      const res = await api.get(`/despachos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limit=500`)
+      setRows(res.data ?? [])
+    } catch { setRows([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchMensual(mes, año) }, [mes, año, fetchMensual])
 
   const prefix = `${año}-${String(mes).padStart(2, '0')}`
 
   const datos = useMemo(() => {
-    const filtrados = despachos.filter(d => d.fecha_despacho.startsWith(prefix))
     const map = {}
-    filtrados.forEach(d => {
-      const p = productos.find(p => p.id === d.producto_id)
-      if (!p) return
-      if (!map[p.id]) map[p.id] = { nombre: p.nombre, categoria: p.categoria, unidad: p.unidad, total: 0, despachos: 0 }
-      map[p.id].total    += d.cantidad
-      map[p.id].despachos += 1
+    rows.forEach(d => {
+      const key = d.producto_id
+      if (!map[key]) map[key] = { nombre: d.producto_nombre, categoria: d.categoria, unidad: d.unidad, total: 0, despachos: 0 }
+      map[key].total    += Number(d.cantidad)
+      map[key].despachos += 1
     })
     return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [despachos, productos, prefix])
+  }, [rows])
 
   const chartData = datos.map(d => ({ name: d.nombre, cantidad: d.total, despachos: d.despachos }))
 
@@ -195,7 +226,9 @@ function TabMensual({ despachos, productos }) {
         </Button>
       </div>
 
-      {datos.length === 0 ? (
+      {loading ? (
+        <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      ) : datos.length === 0 ? (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este mes.</p></CardBody></Card>
       ) : (
         <>
@@ -245,50 +278,47 @@ function TabMensual({ despachos, productos }) {
 }
 
 // ── Por Vehículo ──────────────────────────────────────────────────────────────
-function TabVehiculo({ despachos, productos, vehiculos, dependencias }) {
+function TabVehiculo({ vehiculos, dependencias }) {
   const [vehiculoId, setVehiculoId] = useState('')
   const today = new Date().toISOString().slice(0, 10)
   const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
   const [desde, setDesde] = useState(monthAgo)
   const [hasta, setHasta] = useState(today)
+  const [datos, setDatos] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const datos = useMemo(() => {
-    if (!vehiculoId) return []
-    return despachos
-      .filter(d =>
-        d.vehiculo_id === Number(vehiculoId) &&
-        d.fecha_despacho >= desde &&
-        d.fecha_despacho <= hasta + 'T23:59:59'
-      )
-      .sort((a, b) => a.fecha_despacho.localeCompare(b.fecha_despacho))
-  }, [despachos, vehiculoId, desde, hasta])
+  const fetchVehiculo = useCallback(async (vid, d, h) => {
+    if (!vid) { setDatos([]); return }
+    setLoading(true)
+    try {
+      const res = await api.get(`/despachos?vehiculo_id=${vid}&fecha_desde=${d}&fecha_hasta=${h}&limit=500`)
+      const sorted = (res.data ?? []).sort((a, b) => a.fecha_despacho.localeCompare(b.fecha_despacho))
+      setDatos(sorted)
+    } catch { setDatos([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchVehiculo(vehiculoId, desde, hasta) }, [vehiculoId, desde, hasta, fetchVehiculo])
 
   const chartData = useMemo(() => {
     const map = {}
     datos.forEach(d => {
-      const p = productos.find(p => p.id === d.producto_id)
       const day = d.fecha_despacho.slice(0, 10)
       if (!map[day]) map[day] = { fecha: day }
-      const key = p?.nombre ?? `prod-${d.producto_id}`
-      map[day][key] = (map[day][key] ?? 0) + d.cantidad
+      const key = d.producto_nombre ?? `prod-${d.producto_id}`
+      map[day][key] = (map[day][key] ?? 0) + Number(d.cantidad)
     })
     return Object.values(map)
-  }, [datos, productos])
+  }, [datos])
 
-  const productKeys = [...new Set(datos.map(d => {
-    const p = productos.find(p => p.id === d.producto_id)
-    return p?.nombre ?? `prod-${d.producto_id}`
-  }))]
+  const productKeys = [...new Set(datos.map(d => d.producto_nombre ?? `prod-${d.producto_id}`))]
 
   const v = vehiculos.find(v => v.id === Number(vehiculoId))
   const dep = v ? dependencias.find(d => d.id === v.dependencia_id) : null
 
   function exportar() {
     downloadCSV(
-      datos.map(d => {
-        const p = productos.find(p => p.id === d.producto_id)
-        return [d.fecha_despacho, v?.placa, p?.nombre, d.cantidad, d.unidad, d.solicitado_por]
-      }),
+      datos.map(d => [d.fecha_despacho.slice(0, 10), v?.placa, d.producto_nombre, d.cantidad, d.unidad, d.solicitado_por]),
       ['Fecha', 'Placa', 'Producto', 'Cantidad', 'Unidad', 'Solicitado por'],
       `vehiculo_${v?.placa ?? vehiculoId}_${desde}_${hasta}.csv`
     )
@@ -329,11 +359,15 @@ function TabVehiculo({ despachos, productos, vehiculos, dependencias }) {
         <Card><CardBody><p className="text-center text-slate-400 py-8">Seleccione un vehículo para ver el reporte.</p></CardBody></Card>
       )}
 
-      {vehiculoId && datos.length === 0 && (
+      {vehiculoId && loading && (
+        <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      )}
+
+      {vehiculoId && !loading && datos.length === 0 && (
         <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este vehículo en el período seleccionado.</p></CardBody></Card>
       )}
 
-      {vehiculoId && datos.length > 0 && (
+      {vehiculoId && !loading && datos.length > 0 && (
         <>
           {/* Info vehículo */}
           {v && (
@@ -373,17 +407,14 @@ function TabVehiculo({ despachos, productos, vehiculos, dependencias }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {datos.map(d => {
-                  const p = productos.find(p => p.id === d.producto_id)
-                  return (
-                    <tr key={d.id}>
-                      <td className="px-4 py-3 text-slate-500">{formatDate(d.fecha_despacho)}</td>
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{p?.nombre}</td>
-                      <td className="px-4 py-3 text-right">{formatNumber(d.cantidad, 0)} {d.unidad}</td>
-                      <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">{d.solicitado_por}</td>
-                    </tr>
-                  )
-                })}
+                {datos.map(d => (
+                  <tr key={d.id}>
+                    <td className="px-4 py-3 text-slate-500">{formatDate(d.fecha_despacho)}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{d.producto_nombre}</td>
+                    <td className="px-4 py-3 text-right">{formatNumber(d.cantidad, 0)} {d.unidad}</td>
+                    <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">{d.solicitado_por}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </Card>
@@ -457,7 +488,7 @@ function TabInventario({ productos }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Reportes() {
-  const { despachos, productos, vehiculos, dependencias } = useData()
+  const { productos, vehiculos, dependencias } = useData()
   const { hasPermiso } = useAuth()
   const [activeTab, setActiveTab] = useState('diario')
 
@@ -487,9 +518,9 @@ export default function Reportes() {
         ))}
       </div>
 
-      {activeTab === 'diario'     && <TabDiario    despachos={despachos} productos={productos} />}
-      {activeTab === 'mensual'    && <TabMensual   despachos={despachos} productos={productos} />}
-      {activeTab === 'vehiculo'   && <TabVehiculo  despachos={despachos} productos={productos} vehiculos={vehiculos} dependencias={dependencias} />}
+      {activeTab === 'diario'     && <TabDiario />}
+      {activeTab === 'mensual'    && <TabMensual />}
+      {activeTab === 'vehiculo'   && <TabVehiculo vehiculos={vehiculos} dependencias={dependencias} />}
       {activeTab === 'inventario' && <TabInventario productos={productos} />}
     </div>
   )
