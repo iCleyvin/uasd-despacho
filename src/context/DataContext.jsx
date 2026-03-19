@@ -164,6 +164,11 @@ export function DataProvider({ children }) {
     setUsuarios(prev => prev.map(u => u.id === id ? updated : u))
   }, [])
 
+  const eliminarUsuario = useCallback(async (id) => {
+    await api.delete(`/usuarios/${id}`)
+    setUsuarios(prev => prev.filter(u => u.id !== id))
+  }, [])
+
   // ── Auditoría ─────────────────────────────────────────────────────────────
   const loadAuditoria = useCallback(async (params = {}) => {
     const qs = new URLSearchParams(params).toString()
@@ -187,7 +192,7 @@ export function DataProvider({ children }) {
       // dependencias
       crearDependencia, editarDependencia, toggleDependenciaActivo,
       // usuarios
-      crearUsuario, editarUsuario, toggleUsuarioActivo,
+      crearUsuario, editarUsuario, toggleUsuarioActivo, eliminarUsuario,
     }}>
       {children}
     </DataContext.Provider>

@@ -5,7 +5,7 @@ const { body, param, validationResult } = require('express-validator')
 const { requireAuth, requireRole } = require('../middleware/auth')
 const { addAudit } = require('../middleware/audit')
 
-const SAFE_FIELDS = 'id, nombre, apellido, email, rol, activo, created_at, permisos'
+const SAFE_FIELDS = 'id, nombre, apellido, email, rol, activo, created_at, permisos, eliminado, eliminado_at'
 const ROLES_VALIDOS = ['admin', 'supervisor', 'despachador']
 
 const PERMISOS_POR_ROL = {
@@ -64,7 +64,7 @@ router.get('/online', requireAuth, requireRole('admin', 'supervisor'), async (_r
     const { rows } = await db.query(`
       SELECT id, nombre, apellido, rol, last_seen
       FROM usuarios
-      WHERE activo = true AND last_seen > NOW() - INTERVAL '3 minutes'
+      WHERE activo = true AND eliminado IS NOT TRUE AND last_seen > NOW() - INTERVAL '3 minutes'
       ORDER BY last_seen DESC
     `)
     res.json(rows)
@@ -76,7 +76,7 @@ router.get('/online', requireAuth, requireRole('admin', 'supervisor'), async (_r
 
 router.get('/', requireAuth, requireRole('admin'), async (_req, res) => {
   try {
-    const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios ORDER BY created_at`)
+    const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios WHERE eliminado IS NOT TRUE ORDER BY created_at`)
     res.json({ data: rows, total: rows.length })
   } catch (err) {
     console.error('[usuarios GET /]', err.message)
@@ -166,6 +166,43 @@ router.patch('/:id/toggle',
       datos_antes: { activo: cur[0].activo }, datos_nuevo: { activo: nuevoActivo },
     })
     res.json(rows[0])
+  }
+)
+
+// ── Eliminación lógica (soft delete) ──────────────────────────────────────────
+// El registro queda en BD para mantener integridad del historial de despachos y auditoría.
+// Se mangle el email para liberar el UNIQUE y permitir re-registro con el mismo correo.
+router.delete('/:id',
+  requireAuth, requireRole('admin'),
+  [param('id').isInt()], validar,
+  async (req, res) => {
+    const id = Number(req.params.id)
+    if (id === req.user.id)
+      return res.status(400).json({ error: 'No puedes eliminar tu propio usuario' })
+
+    const { rows } = await db.query(
+      `SELECT ${SAFE_FIELDS} FROM usuarios WHERE id=$1 AND eliminado IS NOT TRUE`, [id]
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado o ya eliminado' })
+
+    // Mangle del email para liberar el UNIQUE constraint y poder re-registrar el mismo correo
+    const emailMangle = `${rows[0].email}__eliminado__${id}`
+
+    await db.query(
+      `UPDATE usuarios
+       SET eliminado = true, eliminado_at = NOW(), activo = false,
+           email = $1, token_version = COALESCE(token_version, 1) + 1
+       WHERE id = $2`,
+      [emailMangle, id]
+    )
+
+    await addAudit({
+      accion: 'DELETE', tabla: 'usuarios', registro_id: id, usuario_id: req.user.id,
+      datos_antes: { nombre: rows[0].nombre, apellido: rows[0].apellido, email: rows[0].email, rol: rows[0].rol },
+      datos_nuevo: { accion: 'eliminacion_logica', email_original: rows[0].email },
+    })
+
+    res.json({ ok: true })
   }
 )
 

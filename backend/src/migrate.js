@@ -387,6 +387,10 @@ async function run() {
   // Columna para forzar cambio de contraseña en primer login
   await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false`)
 
+  // Columna para eliminación lógica de usuarios (soft delete)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS eliminado BOOLEAN DEFAULT false`)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMPTZ DEFAULT NULL`)
+
   // Restricción: el stock no puede ser negativo
   await db.query(`
     DO $$ BEGIN

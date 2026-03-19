@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -90,7 +90,7 @@ function UserAvatar({ u, size = 'md' }) {
 
 export default function Usuarios() {
   const { hasRole } = useAuth()
-  const { usuarios, crearUsuario, editarUsuario, toggleUsuarioActivo, loadUsuarios } = useData()
+  const { usuarios, crearUsuario, editarUsuario, toggleUsuarioActivo, eliminarUsuario, loadUsuarios } = useData()
   const navigate = useNavigate()
 
   useEffect(() => { loadUsuarios() }, [loadUsuarios])
@@ -233,6 +233,21 @@ export default function Usuarios() {
       showToast(`Sesiones de ${u.nombre} ${u.apellido} invalidadas.`, 'success')
     } catch (err) {
       showToast(err.message ?? 'Error al invalidar sesiones', 'error')
+    }
+  }
+
+  async function handleEliminar(u) {
+    const ok = await askConfirm(
+      `¿Eliminar permanentemente a ${u.nombre} ${u.apellido}?\n\nEl usuario no podrá iniciar sesión. Su historial de despachos y registros de auditoría se conservan.`,
+      { danger: true }
+    )
+    if (!ok) return
+    try {
+      await eliminarUsuario(u.id)
+      setDetailTarget(null)
+      showToast(`Usuario ${u.nombre} ${u.apellido} eliminado.`, 'success')
+    } catch (err) {
+      showToast(err.message ?? 'Error al eliminar el usuario', 'error')
     }
   }
 
@@ -415,6 +430,20 @@ export default function Usuarios() {
               >
                 {detail.activo ? 'Desactivar usuario' : 'Activar usuario'}
               </Button>
+
+              <div className="border-t border-slate-100 dark:border-slate-700 pt-3">
+                <Button
+                  variant="danger"
+                  icon={<Trash2 className="w-4 h-4" />}
+                  onClick={() => handleEliminar(detail)}
+                  className="w-full"
+                >
+                  Eliminar usuario
+                </Button>
+                <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-2">
+                  El historial de despachos y auditoría se conserva.
+                </p>
+              </div>
             </div>
           </div>
         )}
