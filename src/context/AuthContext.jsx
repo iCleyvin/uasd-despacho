@@ -43,6 +43,12 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    const u = await api.get('/auth/me')
+    localStorage.setItem(USER_KEY, JSON.stringify(u))
+    setUser(u)
+  }, [])
+
   const hasRole = useCallback((...roles) => {
     return user && roles.includes(user.rol)
   }, [user])
@@ -81,7 +87,7 @@ export function AuthProvider({ children }) {
   if (!verified) return null
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, hasRole, hasPermiso }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, hasRole, hasPermiso, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

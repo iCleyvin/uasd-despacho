@@ -384,6 +384,9 @@ async function run() {
   // Columna para presencia en línea
   await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NULL`)
 
+  // Columna para forzar cambio de contraseña en primer login
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false`)
+
   // Restricción: el stock no puede ser negativo
   await db.query(`
     DO $$ BEGIN

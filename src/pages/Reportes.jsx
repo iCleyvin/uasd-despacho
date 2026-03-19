@@ -19,10 +19,11 @@ import Badge from '../components/ui/Badge'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
 
 const TABS = [
-  { id: 'diario',    label: 'Consumo Diario' },
-  { id: 'mensual',   label: 'Consumo Mensual' },
-  { id: 'vehiculo',  label: 'Por Vehículo' },
-  { id: 'inventario',label: 'Inventario Actual' },
+  { id: 'diario',      label: 'Consumo Diario' },
+  { id: 'mensual',     label: 'Consumo Mensual' },
+  { id: 'vehiculo',    label: 'Por Vehículo' },
+  { id: 'dependencia', label: 'Por Dependencia' },
+  { id: 'inventario',  label: 'Inventario Actual' },
 ]
 
 const CATEGORIA_BADGE = {
@@ -516,6 +517,141 @@ function TabInventario({ productos }) {
   )
 }
 
+// ── Por Dependencia ───────────────────────────────────────────────────────────
+function TabDependencia({ dependencias }) {
+  const now = new Date()
+  const [mes, setMes] = useState(now.getMonth() + 1)
+  const [año, setAño] = useState(now.getFullYear())
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const fetchDep = useCallback(async (m, y) => {
+    const mesStr  = String(m).padStart(2, '0')
+    const lastDay = new Date(y, m, 0).getDate()
+    const desde   = `${y}-${mesStr}-01`
+    const hasta   = `${y}-${mesStr}-${String(lastDay).padStart(2, '0')}`
+    setLoading(true); setError('')
+    try {
+      const res = await api.get(`/despachos?fecha_desde=${desde}&fecha_hasta=${hasta}&limit=5000`)
+      setRows(Array.isArray(res.data) ? res.data : [])
+    } catch (err) { setError(err.message); setRows([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { fetchDep(mes, año) }, [mes, año, fetchDep])
+
+  const datos = useMemo(() => {
+    const map = {}
+    rows.forEach(d => {
+      const key = d.dependencia_nombre ?? 'Sin dependencia'
+      if (!map[key]) map[key] = { dependencia: key, total_despachos: 0, combustible: 0, aceite: 0, repuesto: 0, otro: 0 }
+      map[key].total_despachos += 1
+      if (d.categoria === 'combustible')        map[key].combustible += Number(d.cantidad)
+      else if (d.categoria === 'aceite_motor' || d.categoria === 'aceite_transmision') map[key].aceite += Number(d.cantidad)
+      else if (d.categoria === 'repuesto')       map[key].repuesto   += Number(d.cantidad)
+      else                                       map[key].otro       += Number(d.cantidad)
+    })
+    return Object.values(map).sort((a, b) => b.total_despachos - a.total_despachos)
+  }, [rows])
+
+  const chartData = useMemo(() => datos.slice(0, 15).map(d => ({
+    name: d.dependencia.length > 12 ? d.dependencia.slice(0, 12) + '…' : d.dependencia,
+    fullName: d.dependencia,
+    Combustible: d.combustible,
+    Aceite: d.aceite,
+    Repuesto: d.repuesto,
+  })), [datos])
+
+  const prefix = `${año}-${String(mes).padStart(2, '0')}`
+  const MESES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+  function exportarCSV() {
+    downloadCSV(
+      datos.map(d => [d.dependencia, d.total_despachos, d.combustible.toFixed(2), d.aceite.toFixed(2), d.repuesto.toFixed(2)]),
+      ['Dependencia', 'Nº Despachos', 'Combustible (gal)', 'Aceite (ctos)', 'Repuestos (ud)'],
+      `consumo_dependencias_${prefix}.csv`
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div className="flex gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Mes</label>
+            <select value={mes} onChange={e => setMes(Number(e.target.value))}
+              className="rounded-lg border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-600/40">
+              {MESES.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Año</label>
+            <input type="number" value={año} onChange={e => setAño(Number(e.target.value))}
+              min="2020" max={now.getFullYear()}
+              className="rounded-lg border border-slate-200 dark:border-slate-600 px-4 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-600/40 w-24" />
+          </div>
+        </div>
+        <ExportMenu onCSV={exportarCSV} disabled={datos.length === 0} />
+      </div>
+
+      {loading ? (
+        <Card><CardBody><div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 className="w-4 h-4 animate-spin" /> Cargando…</div></CardBody></Card>
+      ) : error ? (
+        <Card><CardBody><p className="text-center text-red-500 py-8">Error: {error}</p></CardBody></Card>
+      ) : datos.length === 0 ? (
+        <Card><CardBody><p className="text-center text-slate-400 py-8">Sin despachos para este mes.</p></CardBody></Card>
+      ) : (
+        <>
+          <Card>
+            <CardBody>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(val, name, props) => [val.toFixed(2), name]} labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName ?? label} />
+                  <Legend />
+                  <Bar dataKey="Combustible" stackId="a" fill="#1a3c8f" radius={[0,0,0,0]} />
+                  <Bar dataKey="Aceite"      stackId="a" fill="#c8a951" radius={[0,0,0,0]} />
+                  <Bar dataKey="Repuesto"    stackId="a" fill="#10b981" radius={[4,4,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardBody>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">#</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Dependencia</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400">Despachos</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden sm:table-cell">Combustible</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden md:table-cell">Aceite</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-600 dark:text-slate-400 hidden lg:table-cell">Repuestos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {datos.map((d, i) => (
+                  <tr key={d.dependencia}>
+                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{d.dependencia}</td>
+                    <td className="px-4 py-3 text-right font-bold text-primary-600">{d.total_despachos}</td>
+                    <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 hidden sm:table-cell">{d.combustible > 0 ? `${formatNumber(d.combustible, 0)} gal` : '—'}</td>
+                    <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 hidden md:table-cell">{d.aceite > 0 ? `${formatNumber(d.aceite, 0)} ctos` : '—'}</td>
+                    <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400 hidden lg:table-cell">{d.repuesto > 0 ? `${formatNumber(d.repuesto, 0)} ud` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Reportes() {
   const { productos, vehiculos, dependencias } = useData()
@@ -548,10 +684,11 @@ export default function Reportes() {
         ))}
       </div>
 
-      {activeTab === 'diario'     && <TabDiario />}
-      {activeTab === 'mensual'    && <TabMensual />}
-      {activeTab === 'vehiculo'   && <TabVehiculo vehiculos={vehiculos} dependencias={dependencias} />}
-      {activeTab === 'inventario' && <TabInventario productos={productos} />}
+      {activeTab === 'diario'      && <TabDiario />}
+      {activeTab === 'mensual'     && <TabMensual />}
+      {activeTab === 'vehiculo'    && <TabVehiculo vehiculos={vehiculos} dependencias={dependencias} />}
+      {activeTab === 'dependencia' && <TabDependencia dependencias={dependencias} />}
+      {activeTab === 'inventario'  && <TabInventario productos={productos} />}
     </div>
   )
 }

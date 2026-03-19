@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
@@ -12,6 +12,8 @@ import Badge from '../components/ui/Badge'
 import Modal from '../components/ui/Modal'
 import Input, { Select } from '../components/ui/Input'
 import Card from '../components/ui/Card'
+import Paginator from '../components/ui/Paginator'
+import { usePagination } from '../hooks/usePagination'
 
 const ROL_BADGE = {
   admin:       'danger',
@@ -126,6 +128,8 @@ export default function Usuarios() {
 
   // El detalle siempre refleja el estado actualizado del contexto
   const detail = detailTarget ? (usuarios.find(u => u.id === detailTarget.id) ?? detailTarget) : null
+
+  const { paged, page, totalPages, goTo } = usePagination(usuarios, 15)
 
   function openCreate() {
     setEditTarget(null)
@@ -296,7 +300,7 @@ export default function Usuarios() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {usuarios.map(u => (
+              {paged.map(u => (
                 <tr
                   key={u.id}
                   onClick={() => setDetailTarget(u)}
@@ -325,6 +329,7 @@ export default function Usuarios() {
             </tbody>
           </table>
         </div>
+        <Paginator page={page} totalPages={totalPages} onPage={goTo} total={usuarios.length} pageSize={15} />
       </Card>
 
       {/* ── Modal de detalle ───────────────────────────────────────────── */}
@@ -427,10 +432,17 @@ export default function Usuarios() {
             <p className="text-center text-slate-500 py-6">Generando token...</p>
           ) : resetData ? (
             <>
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-1">
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Token generado para {resetData.usuario}</p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">Expira en 1 hora. Uso único.</p>
-              </div>
+              {resetData.email_sent ? (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">✓ Email enviado a {resetData.email}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">El usuario recibirá el enlace en su correo. Expira en 1 hora.</p>
+                </div>
+              ) : (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-1">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Token generado para {resetData.usuario}</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Email no configurado — comparte el enlace manualmente. Expira en 1 hora.</p>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-1.5">
                   Enlace para compartir con el usuario

@@ -5,7 +5,17 @@ const jwt       = require('jsonwebtoken')
 const rateLimit = require('express-rate-limit')
 const db        = require('../db')
 const { requireAuth, requireRole } = require('../middleware/auth')
+const { sendResetEmail }           = require('../lib/mailer')
 const { addAudit } = require('../middleware/audit')
+
+// Rate limit para login — 10 intentos por 15 minutos por IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos de inicio de sesión. Espera 15 minutos.' },
+})
 
 // Rate limit estricto para endpoints de reset de contraseña
 const resetLimiter = rateLimit({
@@ -29,7 +39,7 @@ const COOKIE_OPTS = {
 // Política de contraseñas
 const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body
     if (!email || !password)
@@ -67,7 +77,7 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, nombre, apellido, email, rol, activo, created_at, permisos FROM usuarios WHERE id = $1', [req.user.id]
+      'SELECT id, nombre, apellido, email, rol, activo, created_at, permisos, must_change_password FROM usuarios WHERE id = $1', [req.user.id]
     )
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' })
     res.json({ ...rows[0], permisos: rows[0].permisos ?? [] })
@@ -116,12 +126,22 @@ router.post('/generate-reset-token/:userId', requireAuth, requireRole('admin'), 
       datos_nuevo: { accion: 'token_generado', target_email: rows[0].email, expires: expires.toISOString() },
     })
 
-    // Devolver el token en texto plano — el admin debe compartirlo con el usuario
+    // Intentar enviar email automáticamente si SMTP está configurado
+    const resetUrl    = `${process.env.APP_URL ?? 'http://localhost:3001'}/reset-password?token=${token}`
+    const emailSent   = await sendResetEmail({
+      nombre:   rows[0].nombre,
+      email:    rows[0].email,
+      resetUrl,
+      expires,
+    }).catch(err => { console.error('[mailer] Error al enviar email:', err.message); return false })
+
+    // Devolver el token en texto plano — el admin puede compartirlo si el email falló
     res.json({
       token,
-      usuario: `${rows[0].nombre} ${rows[0].apellido}`,
-      email: rows[0].email,
-      expires: expires.toISOString(),
+      usuario:    `${rows[0].nombre} ${rows[0].apellido}`,
+      email:      rows[0].email,
+      expires:    expires.toISOString(),
+      email_sent: emailSent,
     })
   } catch (err) {
     console.error('[auth/generate-reset-token]', err.message)
@@ -174,9 +194,9 @@ router.post('/reset-password', resetLimiter, async (req, res) => {
 // ── Cambiar contraseña propia (usuario autenticado) ────────────────────────────
 router.post('/change-password', requireAuth, async (req, res) => {
   try {
-    const { actual, nueva } = req.body
-    if (!actual || !nueva)
-      return res.status(400).json({ error: 'Contraseña actual y nueva son requeridas' })
+    const { actual, nueva, force } = req.body
+    if (!nueva)
+      return res.status(400).json({ error: 'La nueva contraseña es requerida' })
     if (!PASSWORD_REGEX.test(nueva))
       return res.status(400).json({ error: 'La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un símbolo' })
 
@@ -184,13 +204,17 @@ router.post('/change-password', requireAuth, async (req, res) => {
     const user = rows[0]
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' })
 
-    const ok = await bcrypt.compare(actual, user.password_hash)
-    if (!ok) return res.status(400).json({ error: 'Contraseña actual incorrecta' })
+    // En modo forzado (primer login) no se requiere la contraseña actual
+    if (!force) {
+      if (!actual) return res.status(400).json({ error: 'Contraseña actual requerida' })
+      const ok = await bcrypt.compare(actual, user.password_hash)
+      if (!ok) return res.status(400).json({ error: 'Contraseña actual incorrecta' })
+    }
 
     const newHash = await bcrypt.hash(nueva, 12)
     const { rows: updated } = await db.query(
-      `UPDATE usuarios SET password_hash=$1, token_version = COALESCE(token_version, 1) + 1
-       WHERE id=$2 RETURNING token_version`,
+      `UPDATE usuarios SET password_hash=$1, token_version = COALESCE(token_version, 1) + 1,
+       must_change_password = false WHERE id=$2 RETURNING token_version`,
       [newHash, req.user.id]
     )
 

@@ -91,8 +91,8 @@ router.post('/', requireAuth, requireRole('admin'), [...validarUsuario, validarP
   const permisosDefault = JSON.stringify(PERMISOS_POR_ROL[rol] ?? [])
   try {
     const { rows } = await db.query(`
-      INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, permisos)
-      VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${SAFE_FIELDS}
+      INSERT INTO usuarios (nombre, apellido, email, password_hash, rol, permisos, must_change_password)
+      VALUES ($1,$2,$3,$4,$5,$6, true) RETURNING ${SAFE_FIELDS}
     `, [nombre.trim(), apellido.trim(), email, hash, rol, permisosDefault])
     await addAudit({
       accion: 'CREATE', tabla: 'usuarios', registro_id: rows[0].id, usuario_id: req.user.id,

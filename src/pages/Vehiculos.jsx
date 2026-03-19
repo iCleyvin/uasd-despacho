@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Plus, Edit2, Power, Search, Fuel, LayoutGrid, List } from 'lucide-react'
+import { usePagination } from '../hooks/usePagination'
+import Paginator from '../components/ui/Paginator'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -78,6 +80,9 @@ export default function Vehiculos() {
     }
     return true
   }), [vehiculos, filterDep, search])
+
+  const PAGE_SIZE = viewMode === 'grid' ? 24 : 20
+  const { paged, page, totalPages, goTo, reset: resetPage } = usePagination(filtered, PAGE_SIZE)
 
   if (!hasPermiso('vehiculos.ver')) return <AccessDenied />
 
@@ -226,7 +231,7 @@ export default function Vehiculos() {
                 {filtered.length === 0 && (
                   <tr><td colSpan={7} className="text-center py-12 text-slate-400">No se encontraron vehículos.</td></tr>
                 )}
-                {filtered.map(v => {
+                {paged.map(v => {
                   const dep = dependencias.find(d => d.id === v.dependencia_id)
                   return (
                     <tr
@@ -259,12 +264,13 @@ export default function Vehiculos() {
               </tbody>
             </table>
           </div>
+          <Paginator page={page} totalPages={totalPages} onPage={goTo} total={filtered.length} pageSize={20} />
         </Card>
       )}
 
       {/* Grid (cuadrícula) */}
       {viewMode === 'grid' && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map(v => {
+        {paged.map(v => {
           const dep = dependencias.find(d => d.id === v.dependencia_id)
           return (
             <Card
@@ -321,6 +327,13 @@ export default function Vehiculos() {
         {filtered.length === 0 && (
           <div className="col-span-full text-center py-16 text-slate-400">
             No se encontraron vehículos con los filtros aplicados.
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="col-span-full">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Paginator page={page} totalPages={totalPages} onPage={goTo} total={filtered.length} pageSize={24} />
+            </div>
           </div>
         )}
       </div>}

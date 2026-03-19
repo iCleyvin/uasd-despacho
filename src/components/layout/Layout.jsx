@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import StockAlertBanner from './StockAlertBanner'
+import ForceChangePassword from '../ui/ForceChangePassword'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import { useAuth } from '../../context/AuthContext'
@@ -38,6 +39,8 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <ForceChangePassword />
 
       {/* Inactivity warning modal */}
       <Modal open={showWarning} onClose={() => setShowWarning(false)} title="¿Sigues ahí?">

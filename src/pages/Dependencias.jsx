@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, Truck, Search } from 'lucide-react'
+import { usePagination } from '../hooks/usePagination'
+import Paginator from '../components/ui/Paginator'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { useConfirm } from '../hooks/useConfirm'
@@ -40,6 +42,8 @@ export default function Dependencias() {
       d.nombre.toLowerCase().includes(q) || d.codigo.toLowerCase().includes(q)
     )
   }, [dependencias, search])
+
+  const { paged, page, totalPages, goTo, reset: resetPage } = usePagination(filtered, 20)
 
   function vehiculosDe(depId) {
     return vehiculos.filter(v => v.dependencia_id === depId)
@@ -126,7 +130,7 @@ export default function Dependencias() {
           <Input
             placeholder="Buscar nombre o código…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); resetPage() }}
             icon={<Search className="w-4 h-4" />}
             className="w-56"
           />
@@ -154,7 +158,7 @@ export default function Dependencias() {
               {filtered.length === 0 && (
                 <tr><td colSpan={4} className="text-center py-10 text-slate-400">Sin resultados para "{search}"</td></tr>
               )}
-              {filtered.map(d => (
+              {paged.map(d => (
                 <tr
                   key={d.id}
                   onClick={() => openDetail(d)}
@@ -179,6 +183,7 @@ export default function Dependencias() {
             </tbody>
           </table>
         </div>
+        <Paginator page={page} totalPages={totalPages} onPage={goTo} total={filtered.length} pageSize={20} />
       </Card>
 
       {/* ── Modal de detalle ─────────────────────────────────────────────── */}
