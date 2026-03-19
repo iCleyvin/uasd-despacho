@@ -24,9 +24,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className={clsx('bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full animate-fade-in', sizeClass)}>
+      <div className={clsx('bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full animate-fade-in flex flex-col max-h-[90vh]', sizeClass)}>
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 shrink-0">
             <h2 className="text-base font-semibold font-display text-slate-900 dark:text-slate-100">{title}</h2>
             <button
               onClick={onClose}
@@ -36,7 +36,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
             </button>
           </div>
         )}
-        {children}
+        <div className="overflow-y-auto">
+          {children}
+        </div>
       </div>
     </div>
   )
