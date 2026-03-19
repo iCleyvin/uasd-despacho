@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield, Trash2, History } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield, Trash2, History, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -116,6 +116,8 @@ export default function Usuarios() {
   const [eliminados,        setEliminados]         = useState([])
   const [eliminadosLoading, setEliminadosLoading] = useState(false)
 
+  const [busqueda, setBusqueda] = useState('')
+
   const { confirm: askConfirm, ConfirmDialog } = useConfirm()
   const { showToast } = useToast()
 
@@ -133,7 +135,17 @@ export default function Usuarios() {
   // El detalle siempre refleja el estado actualizado del contexto
   const detail = detailTarget ? (usuarios.find(u => u.id === detailTarget.id) ?? detailTarget) : null
 
-  const { paged, page, totalPages, goTo } = usePagination(usuarios, 15)
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    if (!q) return usuarios
+    return usuarios.filter(u =>
+      `${u.nombre} ${u.apellido}`.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.rol ?? '').toLowerCase().includes(q)
+    )
+  }, [usuarios, busqueda])
+
+  const { paged, page, totalPages, goTo, reset: resetPage } = usePagination(filtrados, 15)
 
   function openCreate() {
     setEditTarget(null)
@@ -312,12 +324,26 @@ export default function Usuarios() {
         <div>
           <h1 className="text-2xl font-display font-bold text-slate-900 dark:text-slate-100">Usuarios</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            {usuarios.length} usuarios · {usuarios.filter(u => u.activo).length} activos
+            {filtrados.length !== usuarios.length
+              ? `${filtrados.length} de ${usuarios.length} usuarios`
+              : `${usuarios.length} usuarios · ${usuarios.filter(u => u.activo).length} activos`}
           </p>
         </div>
-        <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
-          Nuevo Usuario
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar usuario..."
+              value={busqueda}
+              onChange={e => { setBusqueda(e.target.value); resetPage() }}
+              className="pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 w-48"
+            />
+          </div>
+          <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -362,7 +388,7 @@ export default function Usuarios() {
             </tbody>
           </table>
         </div>
-        <Paginator page={page} totalPages={totalPages} onPage={goTo} total={usuarios.length} pageSize={15} />
+        <Paginator page={page} totalPages={totalPages} onPage={goTo} total={filtrados.length} pageSize={15} />
         <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700">
           <button
             onClick={openEliminados}

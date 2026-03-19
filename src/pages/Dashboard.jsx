@@ -160,7 +160,7 @@ export default function Dashboard() {
   const todayCombustible = todayDespachos.filter(d => d.categoria === 'combustible').reduce((s, d) => s + Number(d.cantidad), 0)
   const todayAceite      = todayDespachos.filter(d => d.categoria === 'aceite_motor').reduce((s, d) => s + Number(d.cantidad), 0)
   const lowStock         = productos.filter(p => Number(p.stock_actual) <= Number(p.stock_minimo))
-  const recentDespachos  = despachos
+  const recentDespachos  = despachos.slice(0, 10)
 
   return (
     <div className="space-y-6">

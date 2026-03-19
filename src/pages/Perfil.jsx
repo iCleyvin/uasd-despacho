@@ -417,7 +417,6 @@ export default function Perfil() {
   const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
 
-  // Merge backend response into AuthContext
   async function handleUpdate() {
     await refreshUser()
   }
