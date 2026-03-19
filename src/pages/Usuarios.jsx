@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield, Trash2 } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check, LogOut, Shield, Trash2, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
@@ -111,6 +111,10 @@ export default function Usuarios() {
   const [permisosTarget,   setPermisosTarget]   = useState(null)
   const [permisosSelected, setPermisosSelected] = useState([])
   const [permisosSaving,   setPermisosSaving]   = useState(false)
+
+  const [eliminadosModal,   setEliminadosModal]   = useState(false)
+  const [eliminados,        setEliminados]         = useState([])
+  const [eliminadosLoading, setEliminadosLoading] = useState(false)
 
   const { confirm: askConfirm, ConfirmDialog } = useConfirm()
   const { showToast } = useToast()
@@ -251,6 +255,20 @@ export default function Usuarios() {
     }
   }
 
+  async function openEliminados() {
+    setEliminadosModal(true)
+    setEliminadosLoading(true)
+    try {
+      const res = await api.get('/usuarios/eliminados')
+      setEliminados(res.data)
+    } catch (err) {
+      showToast(err.message ?? 'Error al cargar usuarios eliminados', 'error')
+      setEliminadosModal(false)
+    } finally {
+      setEliminadosLoading(false)
+    }
+  }
+
   function getResetUrl() {
     if (!resetData) return ''
     return `${window.location.origin}/reset-password?token=${resetData.token}`
@@ -345,6 +363,15 @@ export default function Usuarios() {
           </table>
         </div>
         <Paginator page={page} totalPages={totalPages} onPage={goTo} total={usuarios.length} pageSize={15} />
+        <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700">
+          <button
+            onClick={openEliminados}
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+          >
+            <History className="w-3.5 h-3.5" />
+            Ver usuarios eliminados
+          </button>
+        </div>
       </Card>
 
       {/* ── Modal de detalle ───────────────────────────────────────────── */}
@@ -634,6 +661,53 @@ export default function Usuarios() {
                 Guardar
               </Button>
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal usuarios eliminados ──────────────────────────────────── */}
+      <Modal
+        open={eliminadosModal}
+        onClose={() => setEliminadosModal(false)}
+        title="Usuarios eliminados"
+        size="lg"
+      >
+        <div className="p-6">
+          {eliminadosLoading ? (
+            <p className="text-center text-slate-500 py-8">Cargando...</p>
+          ) : eliminados.length === 0 ? (
+            <p className="text-center text-slate-400 py-8 text-sm">No hay usuarios eliminados.</p>
+          ) : (
+            <div className="space-y-1">
+              {eliminados.map(u => (
+                <div
+                  key={u.id}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/40"
+                >
+                  <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs font-bold shrink-0">
+                    {u.nombre[0]}{u.apellido[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 line-through">
+                      {u.nombre} {u.apellido}
+                    </p>
+                    <p className="text-xs text-slate-400">{u.email.replace(/__eliminado__\d+$/, '')}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <Badge variant={ROL_BADGE[u.rol] ?? 'neutral'}>{ROL_LABELS[u.rol] ?? u.rol}</Badge>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Eliminado {formatDate(u.eliminado_at)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs text-slate-400 text-center">
+              {eliminados.length > 0 && `${eliminados.length} usuario${eliminados.length !== 1 ? 's' : ''} eliminado${eliminados.length !== 1 ? 's' : ''} · `}
+              El historial de despachos y auditoría se conserva.
+            </p>
           </div>
         </div>
       </Modal>

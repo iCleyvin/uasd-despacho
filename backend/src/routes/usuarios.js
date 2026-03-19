@@ -74,6 +74,18 @@ router.get('/online', requireAuth, requireRole('admin', 'supervisor'), async (_r
   }
 })
 
+router.get('/eliminados', requireAuth, requireRole('admin'), async (_req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, nombre, apellido, email, rol, eliminado_at, created_at FROM usuarios WHERE eliminado = true ORDER BY eliminado_at DESC`
+    )
+    res.json({ data: rows, total: rows.length })
+  } catch (err) {
+    console.error('[usuarios GET /eliminados]', err.message)
+    res.status(500).json({ error: 'Error al obtener usuarios eliminados' })
+  }
+})
+
 router.get('/', requireAuth, requireRole('admin'), async (_req, res) => {
   try {
     const { rows } = await db.query(`SELECT ${SAFE_FIELDS} FROM usuarios WHERE eliminado IS NOT TRUE ORDER BY created_at`)
