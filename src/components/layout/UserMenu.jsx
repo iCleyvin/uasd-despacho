@@ -95,7 +95,7 @@ export default function UserMenu() {
           onClick={() => setOpen(p => !p)}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          <div className="rounded-full border-2 border-gold-500 overflow-hidden shrink-0 w-8 h-8">
+          <div className="rounded-full ring-2 ring-gold-500 ring-offset-1 shrink-0">
             <UserAvatar user={user} size="md" />
           </div>
           <div className="hidden sm:block text-left">
