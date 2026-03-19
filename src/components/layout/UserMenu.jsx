@@ -8,6 +8,7 @@ import { ROL_LABELS, validatePassword } from '../../utils/format'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
+import UserAvatar from '../ui/UserAvatar'
 import clsx from 'clsx'
 
 function ChangePasswordModal({ open, onClose }) {
@@ -67,8 +68,6 @@ export default function UserMenu() {
   const [logoutAllBusy, setLogoutAllBusy] = useState(false)
   const ref = useRef(null)
 
-  const initials = [user?.nombre?.[0], user?.apellido?.[0]].filter(Boolean).join('').toUpperCase()
-
   useEffect(() => {
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
@@ -96,8 +95,8 @@ export default function UserMenu() {
           onClick={() => setOpen(p => !p)}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
-          <div className="w-8 h-8 rounded-full bg-primary-600 border-2 border-gold-500 flex items-center justify-center text-white text-xs font-bold font-display">
-            {initials}
+          <div className="rounded-full border-2 border-gold-500 overflow-hidden shrink-0">
+            <UserAvatar user={user} size="md" />
           </div>
           <div className="hidden sm:block text-left">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-none">
@@ -118,6 +117,15 @@ export default function UserMenu() {
                 {ROL_LABELS[user?.rol]}
               </span>
             </div>
+
+            {/* Mi Perfil */}
+            <button
+              onClick={() => { setOpen(false); navigate('/perfil') }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              <UserAvatar user={user} size="sm" />
+              Mi Perfil
+            </button>
 
             {/* Theme toggle */}
             <button

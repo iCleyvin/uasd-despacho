@@ -18,6 +18,7 @@ const Reportes       = lazy(() => import('./pages/Reportes'))
 const Auditoria      = lazy(() => import('./pages/Auditoria'))
 const Usuarios       = lazy(() => import('./pages/Usuarios'))
 const ResetPassword  = lazy(() => import('./pages/ResetPassword'))
+const Perfil         = lazy(() => import('./pages/Perfil'))
 
 function PageLoader() {
   return (
@@ -59,6 +60,7 @@ function AppRoutes() {
           <Route path="/reportes"       element={<Reportes />} />
           <Route path="/auditoria"      element={<Auditoria />} />
           <Route path="/usuarios"       element={<Usuarios />} />
+          <Route path="/perfil"         element={<Perfil />} />
           <Route path="*"               element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

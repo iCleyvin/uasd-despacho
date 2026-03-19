@@ -391,6 +391,10 @@ async function run() {
   await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS eliminado BOOLEAN DEFAULT false`)
   await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMPTZ DEFAULT NULL`)
 
+  // Avatar del usuario
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar_preset VARCHAR(50) DEFAULT NULL`)
+  await db.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT NULL`)
+
   // Restricción: el stock no puede ser negativo
   await db.query(`
     DO $$ BEGIN

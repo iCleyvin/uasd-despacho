@@ -77,7 +77,7 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, nombre, apellido, email, rol, activo, created_at, permisos, must_change_password FROM usuarios WHERE id = $1', [req.user.id]
+      'SELECT id, nombre, apellido, email, rol, activo, created_at, permisos, must_change_password, avatar_preset, avatar_url FROM usuarios WHERE id = $1', [req.user.id]
     )
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' })
     res.json({ ...rows[0], permisos: rows[0].permisos ?? [] })
@@ -263,6 +263,72 @@ router.post('/invalidate-sessions/:userId', requireAuth, requireRole('admin'), a
   } catch (err) {
     console.error('[auth/invalidate-sessions]', err.message)
     res.status(500).json({ error: 'Error al invalidar sesiones' })
+  }
+})
+
+// ── Actualizar datos del perfil ────────────────────────────────────────────────
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    const { nombre, apellido } = req.body
+    if (!nombre?.trim() || !apellido?.trim())
+      return res.status(400).json({ error: 'Nombre y apellido son requeridos' })
+
+    const { rows } = await db.query(
+      `UPDATE usuarios SET nombre=$1, apellido=$2 WHERE id=$3
+       RETURNING id, nombre, apellido, email, rol, activo, created_at, permisos, must_change_password, avatar_preset, avatar_url`,
+      [nombre.trim(), apellido.trim(), req.user.id]
+    )
+    await addAudit({ accion: 'UPDATE', tabla: 'usuarios', registro_id: req.user.id, usuario_id: req.user.id, datos_nuevo: { nombre: nombre.trim(), apellido: apellido.trim() } })
+    res.json(rows[0])
+  } catch (err) {
+    console.error('[auth/profile]', err.message)
+    res.status(500).json({ error: 'Error al actualizar perfil' })
+  }
+})
+
+// ── Cambiar avatar ─────────────────────────────────────────────────────────────
+router.patch('/avatar', requireAuth, async (req, res) => {
+  try {
+    const { type, value } = req.body
+    let preset = null, url = null
+
+    if (type === 'preset') {
+      if (!value) return res.status(400).json({ error: 'Preset requerido' })
+      preset = String(value)
+    } else if (type === 'upload') {
+      if (!value || !String(value).startsWith('data:image/'))
+        return res.status(400).json({ error: 'Imagen inválida' })
+      if (String(value).length > 600_000)
+        return res.status(400).json({ error: 'Imagen demasiado grande (máx ~450 KB)' })
+      url = String(value)
+    } else if (type === 'reset') {
+      // both null — just continue
+    } else {
+      return res.status(400).json({ error: 'Tipo inválido' })
+    }
+
+    const { rows } = await db.query(
+      `UPDATE usuarios SET avatar_preset=$1, avatar_url=$2 WHERE id=$3
+       RETURNING id, nombre, apellido, email, rol, activo, created_at, permisos, must_change_password, avatar_preset, avatar_url`,
+      [preset, url, req.user.id]
+    )
+    res.json(rows[0])
+  } catch (err) {
+    console.error('[auth/avatar]', err.message)
+    res.status(500).json({ error: 'Error al actualizar avatar' })
+  }
+})
+
+// ── Estadísticas del usuario actual ───────────────────────────────────────────
+router.get('/me/stats', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT COUNT(*) AS total FROM despachos WHERE despachado_por = $1',
+      [req.user.id]
+    )
+    res.json({ total_despachos: Number(rows[0].total) })
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener estadísticas' })
   }
 })
 
