@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Fuel, Package, Truck, Building2,
+  LayoutDashboard, Package, Truck, Building2,
   BarChart3, ClipboardList, Users, X, ChevronRight, ShieldCheck,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -8,8 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const NAV_ITEMS = [
   { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard',      permiso: null },
-  { to: '/nuevo-despacho', icon: Fuel,            label: 'Nuevo Despacho', permiso: 'despachos.crear' },
-  { to: '/despachos',      icon: ClipboardList,   label: 'Historial',      permiso: 'despachos.ver' },
+  { to: '/despachos',      icon: ClipboardList,   label: 'Despacho',       permiso: 'despachos.ver' },
   { to: '/inventario',     icon: Package,         label: 'Inventario',     permiso: 'inventario.ver' },
   { to: '/vehiculos',      icon: Truck,           label: 'Vehículos',      permiso: 'vehiculos.ver' },
   { to: '/dependencias',   icon: Building2,       label: 'Dependencias',   permiso: 'dependencias.ver' },

@@ -1,4 +1,8 @@
-const { Pool } = require('pg')
+const { Pool, types } = require('pg')
+
+// BIGINT (OID 20) viene como string por defecto; lo convertimos a número.
+// Nuestros IDs nunca superarán Number.MAX_SAFE_INTEGER (9 × 10^15).
+types.setTypeParser(20, val => parseInt(val, 10))
 
 const pool = new Pool({
   connectionString:      process.env.DATABASE_URL,

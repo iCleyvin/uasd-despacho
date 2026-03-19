@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight, Printer, Loader2 } from 'lucide-react'
+import { Fuel, Droplets, AlertTriangle, ClipboardCheck, ArrowRight, Printer, Loader2, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
 import Modal from '../components/ui/Modal'
 import Button from '../components/ui/Button'
 import { useData } from '../context/DataContext'
+import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { formatDateTime, formatNumber } from '../utils/format'
 import { exportDespachoIndividualPDF } from '../lib/exportPdf'
@@ -89,6 +90,7 @@ function DetalleDespacho({ despacho }) {
 
 export default function Dashboard() {
   const { productos } = useData()
+  const { hasPermiso } = useAuth()
 
   const [despachos,      setDespachos]      = useState([])
   const [consumoChart,   setConsumoChart]   = useState([])
@@ -162,11 +164,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold font-display text-slate-900 dark:text-slate-100">Dashboard</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-          Resumen del día · {new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold font-display text-slate-900 dark:text-slate-100">Dashboard</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Resumen del día · {new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </p>
+        </div>
+        {hasPermiso('despachos.crear') && (
+          <Link to="/nuevo-despacho">
+            <Button icon={<Plus className="w-4 h-4" />}>Nuevo Despacho</Button>
+          </Link>
+        )}
       </div>
 
       {/* KPIs */}
@@ -268,7 +277,16 @@ export default function Dashboard() {
                 </tr>
               ))}
               {recentDespachos.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-slate-400">Sin despachos registrados</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center">
+                    <p className="text-slate-400 mb-3">Sin despachos registrados</p>
+                    {hasPermiso('despachos.crear') && (
+                      <Link to="/nuevo-despacho">
+                        <Button icon={<Plus className="w-4 h-4" />} size="sm">Registrar primer despacho</Button>
+                      </Link>
+                    )}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Download, ChevronLeft, ChevronRight, X, Eye, Loader2, Printer } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Search, Download, ChevronLeft, ChevronRight, X, Eye, Loader2, Printer, Plus } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
@@ -12,6 +13,7 @@ import Input, { Select } from '../components/ui/Input'
 import Card, { CardHeader, CardBody } from '../components/ui/Card'
 import ExportMenu from '../components/ui/ExportMenu'
 import { exportDespachosPDF, exportDespachoIndividualPDF } from '../lib/exportPdf'
+import { exportDespachosXlsx } from '../lib/exportXlsx'
 
 const PAGE_SIZE = 20
 
@@ -149,7 +151,23 @@ export default function Despachos() {
             {loading ? 'Cargando…' : `${total.toLocaleString()} despacho${total !== 1 ? 's' : ''} encontrados`}
           </p>
         </div>
-        <ExportMenu onPDF={exportPDF} onCSV={exportCSV} loading={exporting} disabled={total === 0} />
+        <div className="flex items-center gap-2">
+          {hasPermiso('despachos.crear') && (
+            <Link to="/nuevo-despacho">
+              <Button icon={<Plus className="w-4 h-4" />}>Nuevo Despacho</Button>
+            </Link>
+          )}
+          <ExportMenu onPDF={exportPDF} onCSV={exportCSV} onXlsx={async () => {
+            setExporting(true)
+            try {
+              const qs = new URLSearchParams(buildParams(1))
+              qs.delete('page'); qs.delete('limit'); qs.set('limit', '9999')
+              const res = await api.get('/despachos?' + qs)
+              exportDespachosXlsx(res.data)
+            } catch (err) { setExportErr(err.message ?? 'Error al exportar Excel') }
+            finally { setExporting(false) }
+          }} loading={exporting} disabled={total === 0} />
+        </div>
       </div>
 
       {/* Filtros */}

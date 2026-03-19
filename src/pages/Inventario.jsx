@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useConfirm } from '../hooks/useConfirm'
 import { Plus, Package, Power, Edit2, LayoutGrid, List, Upload, History, ArrowDownToLine, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Eye, Printer, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
@@ -13,6 +14,7 @@ import AccessDenied from '../components/ui/AccessDenied'
 import ExportMenu from '../components/ui/ExportMenu'
 import { exportInventarioPDF, exportMovimientoPDF, exportMovimientosPDF } from '../lib/exportPdf'
 import { exportInventarioCSV, exportMovimientosCSV } from '../lib/exportCsv'
+import { exportInventarioXlsx } from '../lib/exportXlsx'
 
 const CATEGORIAS = ['combustible', 'aceite_motor', 'aceite_transmision', 'repuesto', 'otro']
 
@@ -341,6 +343,7 @@ function ImportModal({ open, onClose, onImport }) {
 
 // ── Product Detail Modal ──────────────────────────────────────────────────────
 function ProductDetailModal({ producto, auditoria, canEdit, onEntrada, onEdit, onToggle, onClose }) {
+  const { confirm: askConfirm, ConfirmDialog } = useConfirm()
   if (!producto) return null
 
   const movimientos = auditoria
@@ -350,6 +353,7 @@ function ProductDetailModal({ producto, auditoria, canEdit, onEntrada, onEdit, o
   const variant = stockVariant(producto)
 
   return (
+    <>
     <Modal open={!!producto} onClose={onClose} title={`${producto.nombre}`} size="lg">
       <div className="p-6 space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
@@ -429,10 +433,9 @@ function ProductDetailModal({ producto, auditoria, canEdit, onEntrada, onEdit, o
               size="sm"
               variant={producto.activo !== false ? 'danger' : 'secondary'}
               icon={<Power className="w-3.5 h-3.5" />}
-              onClick={() => {
-                if (confirm(`¿${producto.activo !== false ? 'Desactivar' : 'Activar'} el producto "${producto.nombre}"?`)) {
-                  onToggle()
-                }
+              onClick={async () => {
+                const ok = await askConfirm(`¿${producto.activo !== false ? 'Desactivar' : 'Activar'} el producto "${producto.nombre}"?`)
+                if (ok) onToggle()
               }}
             >
               {producto.activo !== false ? 'Desactivar' : 'Activar'}
@@ -454,6 +457,8 @@ function ProductDetailModal({ producto, auditoria, canEdit, onEntrada, onEdit, o
         </div>
       </div>
     </Modal>
+    {ConfirmDialog}
+    </>
   )
 }
 
@@ -940,7 +945,7 @@ export default function Inventario() {
         <div className="flex items-center gap-2 flex-wrap">
           {activeTab === 'productos' && (
             <>
-              <ExportMenu onPDF={() => exportInventarioPDF(productos)} onCSV={() => exportInventarioCSV(productos)} />
+              <ExportMenu onPDF={() => exportInventarioPDF(productos)} onCSV={() => exportInventarioCSV(productos)} onXlsx={() => exportInventarioXlsx(productos)} />
               <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <button
                   onClick={() => setViewMode('grid')}

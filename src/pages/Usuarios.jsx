@@ -3,6 +3,8 @@ import { Plus, Edit2, ToggleLeft, ToggleRight, ShieldOff, KeyRound, Copy, Check,
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { useConfirm } from '../hooks/useConfirm'
+import { useToast } from '../context/ToastContext'
 import { ROL_LABELS, formatDate, validatePassword } from '../utils/format'
 import { api } from '../lib/api'
 import Button from '../components/ui/Button'
@@ -95,6 +97,9 @@ export default function Usuarios() {
   const [permisosSelected, setPermisosSelected] = useState([])
   const [permisosSaving,   setPermisosSaving]   = useState(false)
 
+  const { confirm: askConfirm, ConfirmDialog } = useConfirm()
+  const { showToast } = useToast()
+
   // Redirect non-admin
   if (!hasRole('admin')) {
     return (
@@ -173,10 +178,9 @@ export default function Usuarios() {
     setErrors(e => ({ ...e, [key]: undefined }))
   }
 
-  function handleToggle(u) {
-    if (confirm(`¿${u.activo ? 'Desactivar' : 'Activar'} al usuario ${u.nombre} ${u.apellido}?`)) {
-      toggleUsuarioActivo(u.id)
-    }
+  async function handleToggle(u) {
+    const ok = await askConfirm(`¿${u.activo ? 'Desactivar' : 'Activar'} al usuario ${u.nombre} ${u.apellido}?`)
+    if (ok) toggleUsuarioActivo(u.id)
   }
 
   async function handleGenerarReset(u) {
@@ -196,12 +200,13 @@ export default function Usuarios() {
   }
 
   async function handleInvalidarSesiones(u) {
-    if (!confirm(`¿Cerrar todas las sesiones activas de ${u.nombre} ${u.apellido}?`)) return
+    const ok = await askConfirm(`¿Cerrar todas las sesiones activas de ${u.nombre} ${u.apellido}?`)
+    if (!ok) return
     try {
       await api.post(`/auth/invalidate-sessions/${u.id}`)
-      alert(`Sesiones de ${u.nombre} ${u.apellido} invalidadas correctamente.`)
+      showToast(`Sesiones de ${u.nombre} ${u.apellido} invalidadas.`, 'success')
     } catch (err) {
-      alert(err.message ?? 'Error al invalidar sesiones')
+      showToast(err.message ?? 'Error al invalidar sesiones', 'error')
     }
   }
 
@@ -526,6 +531,7 @@ export default function Usuarios() {
           </div>
         </div>
       </Modal>
+      {ConfirmDialog}
     </div>
   )
 }

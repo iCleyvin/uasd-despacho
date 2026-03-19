@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Download, ChevronDown, FileText, Sheet } from 'lucide-react'
 
-export default function ExportMenu({ onPDF, onCSV, disabled = false, loading = false }) {
+export default function ExportMenu({ onPDF, onCSV, onXlsx, disabled = false, loading = false }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -42,6 +42,18 @@ export default function ExportMenu({ onPDF, onCSV, disabled = false, loading = f
             <Sheet className="w-4 h-4 text-green-500" />
             CSV
           </button>
+          {onXlsx && (
+            <>
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+              <button
+                onClick={() => { onXlsx(); setOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Sheet className="w-4 h-4 text-emerald-600" />
+                Excel
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

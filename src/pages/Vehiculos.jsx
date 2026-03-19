@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Plus, Edit2, Power, Search, Fuel, LayoutGrid, List } from 'lucide-react'
 import clsx from 'clsx'
 import { useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { useConfirm } from '../hooks/useConfirm'
 import { CATEGORIA_LABELS, formatDateTime, formatNumber } from '../utils/format'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -13,6 +14,7 @@ import AccessDenied from '../components/ui/AccessDenied'
 import ExportMenu from '../components/ui/ExportMenu'
 import { exportVehiculosPDF } from '../lib/exportPdf'
 import { exportVehiculosCSV } from '../lib/exportCsv'
+import { exportVehiculosXlsx } from '../lib/exportXlsx'
 
 const TIPO_OPTIONS = ['Sedan', 'Jeepeta', 'Pickup', 'Camion', 'Microbus', 'Minibus', 'Autobus', 'Tren', 'Motocicleta', 'Otro']
 const COMBUSTIBLE_OPTIONS = ['Gasolina', 'Gasoil', 'Electrico', 'Hibrido']
@@ -150,7 +152,7 @@ export default function Vehiculos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportMenu onPDF={() => exportVehiculosPDF(filtered)} onCSV={() => exportVehiculosCSV(filtered)} />
+          <ExportMenu onPDF={() => exportVehiculosPDF(filtered)} onCSV={() => exportVehiculosCSV(filtered)} onXlsx={() => exportVehiculosXlsx(filtered)} />
           {canEdit && (
             <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
               Nuevo Vehículo
@@ -458,6 +460,7 @@ export default function Vehiculos() {
 }
 
 function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, canEdit, onToggle, onEdit, onClose }) {
+  const { confirm: askConfirm, ConfirmDialog } = useConfirm()
   if (!vehiculo) return null
   const dep = dependencias.find(d => d.id === vehiculo.dependencia_id)
 
@@ -477,6 +480,7 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, can
     .reduce((sum, d) => sum + d.cantidad, 0)
 
   return (
+    <>
     <Modal open={!!vehiculo} onClose={onClose} title={`${vehiculo.placa} — ${vehiculo.marca} ${vehiculo.modelo}`} size="xl">
       <div className="p-6 space-y-5">
         {/* Info */}
@@ -556,10 +560,9 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, can
               <Button
                 variant={vehiculo.activo ? 'danger' : 'secondary'}
                 icon={<Power className="w-4 h-4" />}
-                onClick={() => {
-                  if (confirm(`¿${vehiculo.activo ? 'Desactivar' : 'Activar'} vehículo ${vehiculo.placa}?`)) {
-                    onToggle()
-                  }
+                onClick={async () => {
+                  const ok = await askConfirm(`¿${vehiculo.activo ? 'Desactivar' : 'Activar'} vehículo ${vehiculo.placa}?`)
+                  if (ok) onToggle()
                 }}
               >
                 {vehiculo.activo ? 'Desactivar' : 'Activar'}
@@ -570,6 +573,8 @@ function VehiculoDetailModal({ vehiculo, dependencias, despachos, productos, can
         </div>
       </div>
     </Modal>
+    {ConfirmDialog}
+  </>
   )
 }
 

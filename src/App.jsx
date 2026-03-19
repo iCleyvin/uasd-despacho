@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { DataProvider } from './context/DataContext'
+import { ToastProvider } from './context/ToastContext'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 
@@ -71,7 +72,9 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <DataProvider>
-            <AppRoutes />
+            <ToastProvider>
+              <AppRoutes />
+            </ToastProvider>
           </DataProvider>
         </AuthProvider>
       </ThemeProvider>

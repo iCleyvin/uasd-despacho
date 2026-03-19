@@ -40,14 +40,15 @@ function detectarConflictoCombustible(producto, vehiculoCombustible) {
   if (!producto || producto.categoria !== 'combustible') return null
   if (!vehiculoCombustible) return null
   const n = producto.nombre.toLowerCase()
+  const vc = vehiculoCombustible.toLowerCase()
   const prodEsGasolina = /gasolina|regular|premium|super/.test(n)
   const prodEsGasoil   = /gasoil|diesel|gasoleo/.test(n)
-  if (vehiculoCombustible === 'Electrico')
+  if (vc === 'electrico')
     return `Este vehículo es eléctrico y no debería recibir combustible`
-  if (vehiculoCombustible === 'Hibrido') return null // híbrido acepta combustible
-  if (vehiculoCombustible === 'Gasolina' && prodEsGasoil)
+  if (vc === 'hibrido') return null // híbrido acepta combustible
+  if (vc === 'gasolina' && prodEsGasoil)
     return `Este vehículo usa Gasolina pero estás despachando Gasoil`
-  if (vehiculoCombustible === 'Gasoil' && prodEsGasolina)
+  if (vc === 'gasoil' && prodEsGasolina)
     return `Este vehículo usa Gasoil pero estás despachando Gasolina`
   return null
 }

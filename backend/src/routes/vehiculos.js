@@ -43,7 +43,7 @@ router.get('/', requireAuth, requirePermiso('vehiculos.ver'), async (req, res) =
   }
 })
 
-router.get('/:id', requireAuth, requirePermiso('vehiculos.ver'), async (req, res) => {
+router.get('/:id', requireAuth, requirePermiso('vehiculos.ver'), [param('id').isInt({ min: 1 }).withMessage('ID inválido')], validar, async (req, res) => {
   try {
     const { rows } = await db.query(
       `SELECT v.*, d.nombre as dependencia_nombre FROM vehiculos v

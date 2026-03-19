@@ -7,6 +7,10 @@ if (missingEnv.length) {
   console.error(`[startup] Variables de entorno faltantes: ${missingEnv.join(', ')}`)
   process.exit(1)
 }
+if (process.env.JWT_SECRET.length < 32) {
+  console.error('[startup] JWT_SECRET debe tener al menos 32 caracteres (256 bits) para ser seguro.')
+  process.exit(1)
+}
 
 const express      = require('express')
 const cors         = require('cors')

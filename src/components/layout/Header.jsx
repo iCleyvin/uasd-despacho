@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import UserMenu from './UserMenu'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
+import { useConfirm } from '../../hooks/useConfirm'
 import { api } from '../../lib/api'
 
 const ROL_LABEL = { admin: 'Admin', supervisor: 'Supervisor', despachador: 'Despachador' }
@@ -13,6 +14,7 @@ export default function Header({ onMenuClick }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const lowStock = productos.filter(p => p.activo && Number(p.stock_actual) <= Number(p.stock_minimo))
+  const { confirm: askConfirm, ConfirmDialog } = useConfirm()
   const [open, setOpen] = useState(false)
   const [onlineUsers, setOnlineUsers] = useState([])
   const [kicking, setKicking] = useState(null) // id del usuario siendo desconectado
@@ -44,7 +46,8 @@ export default function Header({ onMenuClick }) {
   }
 
   async function forceLogout(u) {
-    if (!window.confirm(`¿Cerrar la sesión de ${u.nombre} ${u.apellido}?`)) return
+    const ok = await askConfirm(`¿Cerrar la sesión de ${u.nombre} ${u.apellido}?`, { title: 'Cerrar sesión', danger: false })
+    if (!ok) return
     setKicking(u.id)
     try {
       await api.post(`/auth/invalidate-sessions/${u.id}`)
@@ -54,6 +57,7 @@ export default function Header({ onMenuClick }) {
   }
 
   return (
+    <>
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
       {/* Left */}
       <div className="flex items-center gap-3">
@@ -64,8 +68,8 @@ export default function Header({ onMenuClick }) {
           <Menu className="w-5 h-5 text-slate-600 dark:text-slate-300" />
         </button>
         <div className="hidden sm:block">
-          <p className="text-xs text-slate-400">Universidad Autónoma de Santo Domingo</p>
-          <p className="text-sm font-semibold text-primary-600 dark:text-blue-400 font-display leading-none">
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Universidad Autónoma de Santo Domingo</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 font-display leading-none mt-0.5">
             Sistema de Despacho
           </p>
         </div>
@@ -178,5 +182,7 @@ export default function Header({ onMenuClick }) {
         <UserMenu />
       </div>
     </header>
+    {ConfirmDialog}
+    </>
   )
 }

@@ -46,7 +46,7 @@ router.post('/', requireAuth, requirePermiso('dependencias.editar'), validarDepe
   }
 })
 
-router.put('/:id', requireAuth, requirePermiso('dependencias.editar'), validarDependencia, validar, async (req, res) => {
+router.put('/:id', requireAuth, requirePermiso('dependencias.editar'), [param('id').isInt({ min: 1 }).withMessage('ID inválido')], validarDependencia, validar, async (req, res) => {
   try {
     const { nombre, codigo } = req.body
     const { rows } = await db.query(
