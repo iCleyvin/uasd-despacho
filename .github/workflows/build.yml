@@ -48,15 +48,3 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/uasd-despacho-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Trigger Coolify redeploy
-        env:
-          COOLIFY_TOKEN:    ${{ secrets.COOLIFY_TOKEN }}
-          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
-          COOLIFY_URL:      ${{ secrets.COOLIFY_URL }}
-        run: |
-          curl -s -X POST \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "${COOLIFY_URL}/api/v1/deploy" \
-            -d "{\"uuid\": \"${COOLIFY_APP_UUID}\", \"force\": true}"
